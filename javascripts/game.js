@@ -44,7 +44,7 @@
       },
       forwardSpeed: 200, // pixel per sec
       backwardSpeed: 100, // pixel per sec
-      rotationSpeed: 2.5 // radian per sec
+      rotationSpeed: 3 // radian per sec
     });
 
     function addRandomPeople () {

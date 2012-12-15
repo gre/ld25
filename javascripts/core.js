@@ -431,7 +431,17 @@ G.Map = Backbone.Model.extend({
     angle: function (entity) {
       var pointer = this.get("pointer");
       if (pointer) {
-        return Math.PI/2+Math.atan2(entity.x-pointer.x, entity.y-pointer.y);
+        var now = +new Date();
+        if (!this.angleTargetTime) this.angleTargetTime=now;
+        var t = ((now-this.angleTargetTime)/1000);
+        this.angleTarget = Math.PI/2+Math.atan2(entity.x-pointer.x, entity.y-pointer.y);
+        var angle = entity.get("angle");
+        var diff = this.angleTarget-angle;
+        if (diff < -Math.PI) diff += 2*Math.PI;
+        if (diff > Math.PI) diff -= 2*Math.PI;
+        angle += diff*t*(this.get("rotationSpeed")||1);
+        entity.set("angle", angle);
+        this.angleTargetTime = now;
       }
       return entity.get("angle");
     },
