@@ -195,14 +195,31 @@ G.Map = Backbone.Model.extend({
     update: function () {
       this.ai && this.ai.update(this);
     },
+    isRunning: function () {
+      return this.ai && this.ai.running;
+    },
     sprite: function () {
       var i = 0;
       var now = +new Date();
       if (this.speed) {
         i = this.lastSprite;
-        if (now-this.lastSpriteTime > 40000/Math.abs(this.speed)) {
-          this.lastSprite = i = i==1 ? 2 : 1;
-          this.lastSpriteTime = now;
+        var t = ((now-this.lastSpriteTime)/1000)*(Math.abs(this.speed)/80);
+        if (t>1) this.lastSpriteTime = now;
+        else {
+          if (this.isRunning()) {
+            this.lastSprite = t<0.5 ? 1 : 2;
+          }
+          else {
+            if (t<0.4) {
+              this.lastSprite = 1;
+            }
+            else if (t<0.6) {
+              this.lastSprite = 0;
+            }
+            else if (t<1.0) {
+              this.lastSprite = 2;
+            }
+          }
         }
       }
       var image = G.loader.getResource("people_"+this.sex, 3*this.width, 4*this.height);
@@ -314,7 +331,7 @@ G.Map = Backbone.Model.extend({
       this.stopped = false;
       this.running = false;
       this.runFactor = 2;
-      this.visibility = 200;
+      this.visibility = 250;
       this.decisionInterval = 2000;
       this.lastDecision = +new Date();
       this.a = 0;
@@ -348,6 +365,10 @@ G.Map = Backbone.Model.extend({
       if (danger) {
         this.stopped = false;
         this.running = true;
+        this.a = -Math.PI/2+Math.atan2(
+          entity.x-danger.entity.x,
+          entity.y-danger.entity.y
+        );
       }
       else {
         this.stopped = Math.random()<0.3;
