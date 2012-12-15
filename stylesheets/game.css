@@ -1,0 +1,63 @@
+html, body {
+  margin: 0; padding: 0;
+  background: #000;
+  color: #FFF;
+}
+
+a {
+  color: #c50;
+}
+a:hover {
+  color: #e71;
+}
+
+#viewport {
+}
+
+.stage {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  text-align: center;
+  padding: 0;
+  margin: 0 auto;
+  color: white;
+}
+
+.stage h1 {
+  font-size: 3em;
+}
+
+.stage header {
+  width: 100%;
+  padding: 2% 0;
+  text-align: center;
+}
+
+#loader {
+}
+#loader h2 {
+  padding-top: 25%;
+}
+#loader .error {
+  padding: 0;
+  list-style: none;
+  font-family: monospace;
+  font-size: 10px;
+  margin: 20px auto;
+  text-align: center;
+  color: #e00;
+}
+.stage footer {
+  position: absolute;
+  bottom: 5px;
+  text-align: center;
+  margin-top: 10px;
+  display: block;
+  width: 100%;
+  white-space: nowrap;
+}

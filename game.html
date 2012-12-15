@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+  <link rel="stylesheet" href="stylesheets/game.css" />
+</head>
+<body>
+
+  <div id="viewport">
+
+    <div id="loader" class="stage">
+      <h2>Loading...</h2>
+      <progress class="loader"></progress>
+      <ul class="error"></ul>
+    </div>
+
+    <div id="game" class="stage">
+      <canvas class="game"></canvas>
+    </div>
+
+  </div>
+  
+  <!-- libs -->
+  <script type="text/javascript" src="vendors/rAF.js"></script>
+  <script type="text/javascript" src="vendors/jquery-1.8.3.min.js"></script>
+  <script type="text/javascript" src="vendors/underscore-min.js"></script>
+  <script type="text/javascript" src="vendors/backbone-min.js"></script>
+  <script type="text/javascript" src="vendors/Box2dWeb-2.1.a.3.js"></script>
+  <script type="text/javascript" src="vendors/illuminated.js"></script>
+  <!-- the game -->
+  <script type="text/javascript">
+    window.game={};
+  </script>
+  <script type="text/javascript" src="javascripts/imagesTotalBytes.js"></script>
+  <script type="text/javascript" src="javascripts/ImageManager.js"></script>
+  <script type="text/javascript" src="javascripts/core.js"></script>
+  <script type="text/javascript" src="javascripts/game.js"></script>
+</body>
+</html>
