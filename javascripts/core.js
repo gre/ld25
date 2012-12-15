@@ -78,7 +78,6 @@ G.Map = Backbone.Model.extend({
     updateIlluminatedScene: function (ctx, camera) {
       if (this.player && !this.playerLight) {
         this.playerLight = new Lamp({
-            distance: 300,
             color: "rgba(240,220,180,0.9)",
             radius: 3,
             samples: 9,
@@ -98,6 +97,7 @@ G.Map = Backbone.Model.extend({
         this.player.x,
         this.player.y
       );
+      this.playerLight.distance = this.player.get("tongueDistance");
       this.playerLight.angle = this.player.get("angle");
       this.lighting.compute(ctx.canvas.width, ctx.canvas.height);
       this.darkmask.compute(ctx.canvas.width, ctx.canvas.height);
@@ -189,7 +189,8 @@ G.Map = Backbone.Model.extend({
       this.lastSpriteTime = +new Date();
       this.lastSprite = 1;
       this.tongue = 0; /* from 0 to 1 */
-      this.tongueDistance = 200;
+      this.tongueSpeedOut = 10;
+      this.tongueSpeedIn = 10;
     },
     imageId: function () {
       var i = 0;
@@ -203,7 +204,23 @@ G.Map = Backbone.Model.extend({
       }
       return this.sprites[i];
     },
+    tongueOut: function (duration) {
+      this.tongueAnimation = 1;
+      this.tongueDuration = duration;
+      this.tongueDate = +new Date();
+    },
+    tongueIn: function (duration) {
+      this.tongueAnimation = -1;
+      this.tongueDuration = duration;
+      this.tongueDate = +new Date();
+    },
     render: function (ctx, camera) {
+      if (this.tongueAnimation) {
+        var now = +new Date();
+        var t = (now-this.tongueDate)/1000;
+        this.tongueDate = now;
+        this.tongue = G.clamp(0, 1, this.tongue+t*this.tongueDuration*this.tongueAnimation);
+      }
       // Render the tongue
       if (this.tongue) {
         var width = this.get("width");
@@ -211,7 +228,7 @@ G.Map = Backbone.Model.extend({
         var TONGUE_X = Math.round(width/5), 
             TONGUE_Y = Math.round(width/80),
             TONGUE_W = Math.round(width/6);
-        var tongueLength = this.tongueDistance - TONGUE_X;
+        var tongueLength = this.get("tongueDistance") - TONGUE_X;
         var length = Math.round(this.tongue*tongueLength);
         var angle = this.get("angle");
         ctx.save();

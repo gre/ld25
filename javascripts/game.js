@@ -24,11 +24,12 @@
       y: 0
     });
     var player = new G.Monster({
-      x: 200,
-      y: 200,
+      x: window.innerWidth/2,
+      y: window.innerHeight/2,
       angle: 0,
       width: 100,
-      height: 100
+      height: 100,
+      tongueDistance: 200
     });
 
     window.player = player;
@@ -46,13 +47,20 @@
     });
 
     function update () {
-      player.tongue = Math.max(0, Math.cos(+new Date()/100));
       controls.update(player);
     }
 
+    $(window).on("mousedown", function () {
+      player.tongueOut(player.tongueSpeedOut);
+    });
+
+    $(window).on("mouseup", function () {
+      player.tongueIn(player.tongueSpeedIn);
+    });
+
     controls.on("change", function () {
       if (controls.hasChanged("pointer")) {
-        game.playerLight.roughness = G.clamp(0, 0.9, controls.distanceWithPointer(player)/400);
+        game.playerLight.roughness = G.clamp(0, 0.95, controls.distanceWithPointer(player)/400);
       }
     });
 
