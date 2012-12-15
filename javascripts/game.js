@@ -44,7 +44,7 @@
       },
       forwardSpeed: 200, // pixel per sec
       backwardSpeed: 100, // pixel per sec
-      rotationSpeed: 3 // radian per sec
+      rotationSpeed: 5 // radian per sec
     });
 
     function addRandomPeople () {
@@ -71,11 +71,6 @@
     var i = 0;
     function update () {
       controls.update(player);
-
-      if (i++%20==0) {
-        addRandomPeople();
-      }
-
       game.people.each(function (people) {
         people.update();
       });

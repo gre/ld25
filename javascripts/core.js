@@ -79,8 +79,8 @@ G.Map = Backbone.Model.extend({
       if (this.player && !this.playerLight) {
         this.playerLight = new Lamp({
             color: "rgba(240,220,180,0.9)",
-            radius: 3,
-            samples: 9,
+            radius: 0,
+            samples: 1,
             roughness: 0.9
         });
       }
