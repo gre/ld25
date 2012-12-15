@@ -32,7 +32,7 @@ function randomNoise(canvas, x, y, width, height, alpha) {
     return canvas;
 }
  
-function perlinNoise(canvas, noise) {
+function perlinNoise(canvas, force, noise) {
     noise = noise || randomNoise(createCanvas(canvas.width, canvas.height));
     var g = canvas.getContext("2d");
     g.save();
@@ -41,7 +41,7 @@ function perlinNoise(canvas, noise) {
     for (var size = 4; size <= noise.width; size *= 2) {
         var x = (Math.random() * (noise.width - size)) | 0,
             y = (Math.random() * (noise.height - size)) | 0;
-        g.globalAlpha = 4 / size;
+        g.globalAlpha = force / size;
         g.drawImage(noise, x, y, size, size, 0, 0, canvas.width, canvas.height);
     }
  
@@ -52,8 +52,13 @@ function perlinNoise(canvas, noise) {
 G.Map = Backbone.Model.extend({
   initialize: function () {
     var w = this.get("width"), h = this.get("height");
+    var perlinCanvas = createCanvas(w, h);
+    perlinNoise(perlinCanvas, 500, randomNoise(createCanvas(w, h), 0, 0, w, h, 10));
     this.floorTexture = createCanvas(w, h);
-    perlinNoise(this.floorTexture);
+    var ctx = this.floorTexture.getContext("2d");
+    ctx.fillStyle = "#857d74";
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.drawImage(perlinCanvas, 0, 0);
   }
 });
 
@@ -78,7 +83,7 @@ G.Map = Backbone.Model.extend({
     updateIlluminatedScene: function (ctx, camera) {
       if (this.player && !this.playerLight) {
         this.playerLight = new Lamp({
-            color: "rgba(240,220,180,0.9)",
+            color: "rgba(240,220,180,0.8)",
             radius: 0,
             samples: 1,
             roughness: 0.9
@@ -118,12 +123,7 @@ G.Map = Backbone.Model.extend({
     },
 
     renderFloor: function (ctx, camera) {
-      ctx.save();
-      ctx.fillStyle = "#857d74";
-      ctx.globalCompositeOperation = "darker";
       ctx.drawImage(this.map.floorTexture, 0, 0);
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      ctx.restore();
     },
     render: function (ctx, camera) {
       this.updateIlluminatedScene(ctx, camera);
