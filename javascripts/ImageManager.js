@@ -27,8 +27,8 @@
       self.trigger("progress", { value: value, total: totalBytes });
     }
 
-    self.load = function (callback) {
-      self.on("loaded", callback);
+    self.load = function () {
+      self.trigger("loading");
       var i = 0;
       for (var name in images) { (function(i, name){
         var src = images[name].src+"?v="+version;
@@ -45,7 +45,6 @@
             pubProgress();
             if (self.isReady()) {
               self.trigger("loaded");
-              self.off("loaded");
             }
           });
           img.addEventListener("error", function (e) {
@@ -55,10 +54,15 @@
           resources[name] = img;
         }, false);  
         req.addEventListener("error", function (e) {
-          self.trigger("error", { msg: "error for "+images[name].src  });
+          self.trigger("error", { msg: "error for loading "+images[name].src  });
         }, false);  
-        req.open("GET", src, true);  
-        req.send();
+        try {
+          req.open("GET", src, true);  
+          req.send();
+        }
+        catch (e) {
+          self.trigger("error", { msg: "error for loading "+images[name].src  });
+        }
 
         }(i++, name));
       }
