@@ -95,8 +95,8 @@ G.Map = Backbone.Model.extend({
         this.darkmask = new DarkMask({ lights: [this.playerLight] });
       }
       this.playerLight.position = new illuminated.Vec2(
-        this.player.get("x"),
-        this.player.get("y")
+        this.player.x,
+        this.player.y
       );
       this.playerLight.angle = this.player.get("angle");
       this.lighting.compute(ctx.canvas.width, ctx.canvas.height);
@@ -148,8 +148,8 @@ G.Map = Backbone.Model.extend({
 
   G.Character = Backbone.Model.extend({
     render: function (ctx, camera) {
-      var x = this.get("x");
-      var y = this.get("y");
+      var x = this.x;
+      var y = this.y;
       var angle = this.get("angle");
       var image = this.image();
       var w = image.width;
@@ -169,7 +169,8 @@ G.Map = Backbone.Model.extend({
 
   G.People = G.Character.extend({
     initialize: function () {
-
+      this.x = this.get("x");
+      this.y = this.get("y");
     },
     imageId: function () {
       return "people";
@@ -178,6 +179,8 @@ G.Map = Backbone.Model.extend({
 
   G.Monster = G.Character.extend({
     initialize: function () {
+      this.x = this.get("x");
+      this.y = this.get("y");
       this.sprites = [
         "monster",
         "monster_walk1",
@@ -191,7 +194,7 @@ G.Map = Backbone.Model.extend({
       var now = +new Date();
       if (this.speed) {
         i = this.lastSprite;
-        if (now-this.lastSpriteTime > 500/Math.abs(this.speed)) {
+        if (now-this.lastSpriteTime > 50000/Math.abs(this.speed)) {
           this.lastSprite = i = i==1 ? 2 : 1;
           this.lastSpriteTime = now;
         }
@@ -220,35 +223,39 @@ G.Map = Backbone.Model.extend({
       return !!this._down[key];
     },
 
+    distanceWithPointer: function (entity) {
+      var pointer = this.get("pointer");
+      if (!pointer) return Infinity;
+      var x = entity.x-pointer.x;
+      var y = entity.y-pointer.y;
+      return Math.sqrt(x*x+y*y);
+    },
+
     update: function (entity) {
-      var lastUpdate = this.lastUpdate;
       var now = +new Date();
-      var t = (now-lastUpdate)/1000;
+      var t = (now-this.lastUpdate)/1000;
       var keys = this.get("keys");
       var forward = this.isDown(keys.forward);
       var backward = this.isDown(keys.backward);
       var speed = 0;
       if (forward && !backward) {
-        speed = this.get("forwardSpeed")*t;
+        speed = this.get("forwardSpeed");
       }
       else if (backward) {
-        speed = -this.get("backwardSpeed")*t;
+        speed = -this.get("backwardSpeed");
       }
+      var pointer = this.get("pointer");
 
       var angle = entity.get("angle");
-      var x = entity.get("x") + Math.cos(-angle)*speed;
-      var y = entity.get("y") + Math.sin(-angle)*speed;
-      var pointer = this.get("pointer");
       if (pointer) {
-        angle = Math.PI/2+Math.atan2(
-            x-pointer.x,
-            y-pointer.y
-        );
+        angle = Math.PI/2+Math.atan2(entity.x-pointer.x, entity.y-pointer.y);
+        var d = this.distanceWithPointer(entity);
+        speed *= G.smoothstep(30, 150, d);
       }
 
       entity.speed = speed;
-      entity.set("x", x);
-      entity.set("y", y);
+      entity.x = entity.x + Math.cos(-angle)*speed*t;
+      entity.y = entity.y + Math.sin(-angle)*speed*t;
       entity.set("angle", angle);
       this.lastUpdate = now;
     }

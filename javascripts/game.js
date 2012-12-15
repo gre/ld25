@@ -51,12 +51,7 @@
 
     controls.on("change", function () {
       if (controls.hasChanged("pointer")) {
-        var pointer = controls.get("pointer");
-        var x = player.get("x")-pointer.x;
-        var y = player.get("y")-pointer.y;
-        var l = Math.sqrt(x*x+y*y);
-        var v = l/500;
-        game.playerLight.roughness = Math.max(0, Math.min(v, 0.9));
+        game.playerLight.roughness = G.clamp(0, 0.9, controls.distanceWithPointer(player)/400);
       }
     });
 
