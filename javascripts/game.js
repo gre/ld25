@@ -35,12 +35,10 @@
 
     game.setPlayer(player);
 
-    var controls = new G.KeyboardControls({
+    var controls = new G.PlayerControls({
       keys: {
         forward: 38,
-        backward: 40,
-        turnleft: 37,
-        turnright: 39
+        backward: 40
       },
       forwardSpeed: 200, // pixel per sec
       backwardSpeed: 100, // pixel per sec
@@ -50,6 +48,17 @@
     function update () {
       controls.update(player);
     }
+
+    controls.on("change", function () {
+      if (controls.hasChanged("pointer")) {
+        var pointer = controls.get("pointer");
+        var x = player.get("x")-pointer.x;
+        var y = player.get("y")-pointer.y;
+        var l = Math.sqrt(x*x+y*y);
+        var v = l/500;
+        game.playerLight.roughness = Math.max(0, Math.min(v, 0.9));
+      }
+    });
 
     function setViewport (w, h) {
       camera.setSize(w, h);

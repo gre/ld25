@@ -5,11 +5,67 @@
     , DarkMask = illuminated.DarkMask
     ;
 
+function createCanvas (w, h) {
+  var c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  return c;
+}
+
+function randomNoise(canvas, x, y, width, height, alpha) {
+    x = x || 0;
+    y = y || 0;
+    width = width || canvas.width;
+    height = height || canvas.height;
+    alpha = alpha || 255;
+    var g = canvas.getContext("2d"),
+        imageData = g.getImageData(x, y, width, height),
+        random = Math.random,
+        pixels = imageData.data,
+        n = pixels.length,
+        i = 0;
+    while (i < n) {
+        pixels[i++] = pixels[i++] = pixels[i++] = (random() * 256) | 0;
+        pixels[i++] = alpha;
+    }
+    g.putImageData(imageData, x, y);
+    return canvas;
+}
+ 
+function perlinNoise(canvas, noise) {
+    noise = noise || randomNoise(createCanvas(canvas.width, canvas.height));
+    var g = canvas.getContext("2d");
+    g.save();
+    
+    /* Scale random iterations onto the canvas to generate Perlin noise. */
+    for (var size = 4; size <= noise.width; size *= 2) {
+        var x = (Math.random() * (noise.width - size)) | 0,
+            y = (Math.random() * (noise.height - size)) | 0;
+        g.globalAlpha = 4 / size;
+        g.drawImage(noise, x, y, size, size, 0, 0, canvas.width, canvas.height);
+    }
+ 
+    g.restore();
+    return canvas;
+}
+
+G.Map = Backbone.Model.extend({
+  initialize: function () {
+    var w = this.get("w"), h = this.get("h");
+    this.floorTexture = createCanvas(w, h);
+    perlinNoise(this.floorTexture);
+  }
+});
+
   G.Game = Backbone.Model.extend({
 
     initialize: function () {
       this.startTime = +new Date();
       this.people = new Backbone.Collection();
+      this.map = new G.Map({
+        w: 2000,
+        h: 2000
+      });
     },
 
     setViewport: function (w, h) {
@@ -22,8 +78,8 @@
     updateIlluminatedScene: function (ctx, camera) {
       if (this.player && !this.playerLight) {
         this.playerLight = new Lamp({
-            distance: 200,
-            color: "rgba(233,198,150,0.8)",
+            distance: 300,
+            color: "rgba(240,220,180,0.9)",
             radius: 3,
             samples: 9,
             roughness: 0.9
@@ -59,14 +115,17 @@
       ctx.restore();
     },
 
-    renderMap: function (ctx, camera) {
-      // FIXME
-      ctx.fillStyle = "#999";
+    renderFloor: function (ctx, camera) {
+      ctx.save();
+      ctx.fillStyle = "#857d74";
+      ctx.globalCompositeOperation = "darker";
+      ctx.drawImage(this.map.floorTexture, 0, 0);
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
     },
     render: function (ctx, camera) {
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      this.renderMap(ctx, camera);
+      this.renderFloor(ctx, camera);
       this.renderIlluminatedScene(ctx, camera);
       this.people.each(function (people) {
         people.render(ctx, camera);
@@ -95,39 +154,39 @@
       var image = this.image();
       var w = image.width;
       var h = image.height;
-      var width = this.get("width") || w;
-      var height = this.get("height") || h;
-      var halfW = Math.round(width/2);
-      var halfH = Math.round(height/2);
+      var halfW = Math.round(w/2);
+      var halfH = Math.round(h/2);
       ctx.save();
       ctx.translate(Math.round(x), Math.round(y));
       angle && ctx.rotate(-angle);
-      ctx.drawImage(image, -halfW, -halfH, width, height);
+      ctx.drawImage(image, -halfW, -halfH);
       ctx.restore();
     },
-    image: function () { throw "image() must be implemented"; }
+    image: function () {
+      return G.loader.getResource(this.imageId(), this.get("width"), this.get("height"));
+    }
   });
 
   G.People = G.Character.extend({
     initialize: function () {
 
     },
-    image: function () {
-      return G.loader.getResource("people");
+    imageId: function () {
+      return "people";
     }
   });
 
   G.Monster = G.Character.extend({
     initialize: function () {
       this.sprites = [
-        G.loader.getResource("monster"),
-        G.loader.getResource("monster_walk1"),
-        G.loader.getResource("monster_walk2")
+        "monster",
+        "monster_walk1",
+        "monster_walk2"
       ];
       this.lastSpriteTime = +new Date();
       this.lastSprite = 1;
     },
-    image: function () {
+    imageId: function () {
       var i = 0;
       var now = +new Date();
       if (this.speed) {
@@ -141,7 +200,7 @@
     }
   });
 
-  G.KeyboardControls = Backbone.Model.extend({
+  G.PlayerControls = Backbone.Model.extend({
     initialize: function () {
       this.lastUpdate = +new Date();
       this._down = {};
@@ -151,6 +210,9 @@
       });
       $(window).on("keyup", function (e) {
         self._down[e.keyCode] = false;
+      });
+      $(window).on("mousemove", function (e) {
+        self.set("pointer", { x: e.clientX, y: e.clientY });
       });
     },
 
@@ -172,20 +234,17 @@
       else if (backward) {
         speed = -this.get("backwardSpeed")*t;
       }
-      var left = this.isDown(keys.turnleft);
-      var right = this.isDown(keys.turnright);
-      var rotation = 0;
-      if (left && !right) {
-        rotation = this.get("rotationSpeed")*t;
-      }
-      else if (right) {
-        rotation = -this.get("rotationSpeed")*t;
-      }
 
       var angle = entity.get("angle");
       var x = entity.get("x") + Math.cos(-angle)*speed;
       var y = entity.get("y") + Math.sin(-angle)*speed;
-      angle += rotation;
+      var pointer = this.get("pointer");
+      if (pointer) {
+        angle = Math.PI/2+Math.atan2(
+            x-pointer.x,
+            y-pointer.y
+        );
+      }
 
       entity.speed = speed;
       entity.set("x", x);
