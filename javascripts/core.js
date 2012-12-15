@@ -51,7 +51,7 @@ function perlinNoise(canvas, noise) {
 
 G.Map = Backbone.Model.extend({
   initialize: function () {
-    var w = this.get("w"), h = this.get("h");
+    var w = this.get("width"), h = this.get("height");
     this.floorTexture = createCanvas(w, h);
     perlinNoise(this.floorTexture);
   }
@@ -63,8 +63,8 @@ G.Map = Backbone.Model.extend({
       this.startTime = +new Date();
       this.people = new Backbone.Collection();
       this.map = new G.Map({
-        w: 2000,
-        h: 2000
+        width: 2000,
+        height: 2000
       });
     },
 
@@ -97,19 +97,21 @@ G.Map = Backbone.Model.extend({
         this.player.x,
         this.player.y
       );
-      this.playerLight.distance = this.player.get("tongueDistance");
+      this.playerLight.distance = 1.5*this.player.get("tongueDistance");
       this.playerLight.angle = this.player.get("angle");
       this.lighting.compute(ctx.canvas.width, ctx.canvas.height);
       this.darkmask.compute(ctx.canvas.width, ctx.canvas.height);
     },
 
-    renderIlluminatedScene: function (ctx, camera) {
-      // Update states
-      this.updateIlluminatedScene(ctx, camera);
-      // Draw
+    renderLights: function (ctx, camera) {
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       this.lighting.render(ctx);
+      ctx.restore();
+    },
+    
+    renderFog: function (ctx, camera) {
+      ctx.save();
       ctx.globalCompositeOperation = "source-over";
       this.darkmask.render(ctx);
       ctx.restore();
@@ -124,13 +126,15 @@ G.Map = Backbone.Model.extend({
       ctx.restore();
     },
     render: function (ctx, camera) {
+      this.updateIlluminatedScene(ctx, camera);
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       this.renderFloor(ctx, camera);
-      this.renderIlluminatedScene(ctx, camera);
+      this.renderLights(ctx, camera);
       this.people.each(function (people) {
         people.render(ctx, camera);
       });
       this.player && this.player.render(ctx, camera);
+      this.renderFog(ctx, camera);
     }
   });
 
@@ -147,40 +151,76 @@ G.Map = Backbone.Model.extend({
   });
 
   G.Character = Backbone.Model.extend({
+    initialize: function () {
+      this.x = this.get("x");
+      this.y = this.get("y");
+      this.width = this.get("width");
+      this.height = this.get("height");
+    },
     render: function (ctx, camera) {
-      var x = this.x;
-      var y = this.y;
       var angle = this.get("angle");
-      var image = this.image();
-      var w = image.width;
-      var h = image.height;
+      var sprite = this.sprite();
+      var image = sprite.image;
+      var w = this.width||image.width;
+      var h = this.height||image.height;
       var halfW = Math.round(w/2);
       var halfH = Math.round(h/2);
+      var spritex = sprite.x||0;
+      var spritey = sprite.y||0;
+      var spritew = sprite.w||image.width;
+      var spriteh = sprite.h||image.height;
       ctx.save();
-      ctx.translate(Math.round(x), Math.round(y));
+      ctx.translate(Math.round(this.x), Math.round(this.y));
       angle && ctx.rotate(-angle);
-      ctx.drawImage(image, -halfW, -halfH);
+      ctx.drawImage(image, 
+        spritex, spritey, spritew, spriteh,
+        -halfW, -halfH, w, h);
       ctx.restore();
     },
-    image: function () {
-      return G.loader.getResource(this.imageId(), this.get("width"), this.get("height"));
-    }
+    sprite: function () { throw ".sprite() is not implemented" }
   });
 
   G.People = G.Character.extend({
     initialize: function () {
-      this.x = this.get("x");
-      this.y = this.get("y");
+      G.Character.prototype.initialize.apply(this, arguments);
+      this.sex = this.get("sex")=="f" ? "f" : "m";
+      this.model = this.get("model") || 0;
+      this.lastSpriteTime = +new Date();
+      this.lastSprite = 1;
+      this.speed = 200;
     },
-    imageId: function () {
-      return "people";
+    setAI: function (ai) {
+      this.ai = ai;
+    },
+    update: function () {
+      this.ai && this.ai.update(this);
+    },
+    sprite: function () {
+      var i = 0;
+      var now = +new Date();
+      if (this.speed) {
+        i = this.lastSprite;
+        if (now-this.lastSpriteTime > 40000/Math.abs(this.speed)) {
+          this.lastSprite = i = i==1 ? 2 : 1;
+          this.lastSpriteTime = now;
+        }
+      }
+      var image = G.loader.getResource("people_"+this.sex, 3*this.width, 4*this.height);
+      var W = image.width/3;
+      var H = image.height/4;
+      return {
+        image: image,
+        x: Math.round(i*W),
+        y: Math.round(this.model*H),
+        w: Math.round(W),
+        h: Math.round(H)
+      };
     }
   });
 
   G.Monster = G.Character.extend({
     initialize: function () {
-      this.x = this.get("x");
-      this.y = this.get("y");
+      G.Character.prototype.initialize.apply(this, arguments);
       this.sprites = [
         "monster",
         "monster_walk1",
@@ -192,7 +232,7 @@ G.Map = Backbone.Model.extend({
       this.tongueSpeedOut = 10;
       this.tongueSpeedIn = 10;
     },
-    imageId: function () {
+    sprite: function () {
       var i = 0;
       var now = +new Date();
       if (this.speed) {
@@ -202,7 +242,10 @@ G.Map = Backbone.Model.extend({
           this.lastSpriteTime = now;
         }
       }
-      return this.sprites[i];
+      var imageId = this.sprites[i];
+      return {
+        image: G.loader.getResource(imageId, this.width, this.height)
+      };
     },
     tongueOut: function (duration) {
       this.tongueAnimation = 1;
@@ -223,7 +266,7 @@ G.Map = Backbone.Model.extend({
       }
       // Render the tongue
       if (this.tongue) {
-        var width = this.get("width");
+        var width = this.width;
 
         var TONGUE_X = Math.round(width/5), 
             TONGUE_Y = Math.round(width/80),
@@ -249,7 +292,89 @@ G.Map = Backbone.Model.extend({
     }
   });
 
-  G.PlayerControls = Backbone.Model.extend({
+  G.Controls = Backbone.Model.extend({
+    speed: function(entity) { return 0 },
+    angle: function(entity) { return 0 },
+    update: function (entity) {
+      var now = +new Date();
+      if (!this.lastUpdate) this.lastUpdate=now;
+      var t = (now-this.lastUpdate)/1000;
+      var angle = this.angle(entity);
+      var speed = this.speed(entity);
+      entity.speed = speed;
+      entity.x = entity.x + Math.cos(-angle)*speed*t;
+      entity.y = entity.y + Math.sin(-angle)*speed*t;
+      entity.set("angle", angle);
+      this.lastUpdate = now;
+    }
+  });
+
+  G.PeopleAI = G.Controls.extend({
+    initialize: function () {
+      this.stopped = false;
+      this.running = false;
+      this.runFactor = 2;
+      this.visibility = 200;
+      this.decisionInterval = 2000;
+      this.lastDecision = +new Date();
+      this.a = 0;
+      this.opponents = new Backbone.Collection();
+    },
+    checkDanger: function (entity) {
+      if (this.opponents.size()==0) return;
+      var self = this;
+      var closest = 
+        this.opponents
+          .map(function (opponent) {
+            var x = entity.x-opponent.x;
+            var y = entity.y-opponent.y;
+            var d = Math.sqrt(x*x+y*y);
+            return [ d, opponent ];
+          })
+          .filter(function (o) {
+            return o[0]<self.visibility;
+          })
+          .sort(function (a, b) {
+            return a[0]-b[0];
+          })[0];
+      if (!closest) return;
+      return {
+        distance: closest[0],
+        entity: closest[1]
+      }
+    },
+    decide: function (entity) {
+      var danger = this.checkDanger(entity);
+      if (danger) {
+        this.stopped = false;
+        this.running = true;
+      }
+      else {
+        this.stopped = Math.random()<0.3;
+        this.a = 2*Math.PI*Math.random();
+      }
+    },
+    update: function (entity) {
+      var now = +new Date();
+      if (now-this.lastDecision>this.decisionInterval) {
+        this.lastDecision = now;
+        this.decide(entity);
+      }
+      G.Controls.prototype.update.apply(this, arguments);
+    },
+    speed: function (entity) {
+      if (this.stopped) return 0;
+      var speed = this.get("speed");
+      if (this.running)
+        speed *= this.runFactor;
+      return speed;
+    },
+    angle: function (entity) {
+      return this.a;
+    }
+  });
+
+  G.PlayerControls = G.Controls.extend({
     initialize: function () {
       this.lastUpdate = +new Date();
       this._down = {};
@@ -264,22 +389,7 @@ G.Map = Backbone.Model.extend({
         self.set("pointer", { x: e.clientX, y: e.clientY });
       });
     },
-
-    isDown: function (key) {
-      return !!this._down[key];
-    },
-
-    distanceWithPointer: function (entity) {
-      var pointer = this.get("pointer");
-      if (!pointer) return Infinity;
-      var x = entity.x-pointer.x;
-      var y = entity.y-pointer.y;
-      return Math.sqrt(x*x+y*y);
-    },
-
-    update: function (entity) {
-      var now = +new Date();
-      var t = (now-this.lastUpdate)/1000;
+    speed: function (entity) {
       var keys = this.get("keys");
       var forward = this.isDown(keys.forward);
       var backward = this.isDown(keys.backward);
@@ -291,19 +401,30 @@ G.Map = Backbone.Model.extend({
         speed = -this.get("backwardSpeed");
       }
       var pointer = this.get("pointer");
-
-      var angle = entity.get("angle");
       if (pointer) {
-        angle = Math.PI/2+Math.atan2(entity.x-pointer.x, entity.y-pointer.y);
         var d = this.distanceWithPointer(entity);
         speed *= G.smoothstep(30, 150, d);
       }
+      return speed;
+    },
+    angle: function (entity) {
+      var pointer = this.get("pointer");
+      if (pointer) {
+        return Math.PI/2+Math.atan2(entity.x-pointer.x, entity.y-pointer.y);
+      }
+      return entity.get("angle");
+    },
 
-      entity.speed = speed;
-      entity.x = entity.x + Math.cos(-angle)*speed*t;
-      entity.y = entity.y + Math.sin(-angle)*speed*t;
-      entity.set("angle", angle);
-      this.lastUpdate = now;
+    isDown: function (key) {
+      return !!this._down[key];
+    },
+
+    distanceWithPointer: function (entity) {
+      var pointer = this.get("pointer");
+      if (!pointer) return Infinity;
+      var x = entity.x-pointer.x;
+      var y = entity.y-pointer.y;
+      return Math.sqrt(x*x+y*y);
     }
   });
 

@@ -4,7 +4,8 @@
     monster: { src: "images/monster.png" },
     monster_walk1: { src: "images/monster_walk1.png" },
     monster_walk2: { src: "images/monster_walk2.png" },
-    people: { src: "images/people.png" }
+    people_m: { src: "images/men.png" },
+    people_f: { src: "images/women.png" }
   }, IMAGES_TOTAL_BYTES);
   
 
@@ -26,9 +27,9 @@
     var player = new G.Monster({
       x: window.innerWidth/2,
       y: window.innerHeight/2,
+      width: 150,
+      height: 150,
       angle: 0,
-      width: 100,
-      height: 100,
       tongueDistance: 200
     });
 
@@ -46,8 +47,38 @@
       rotationSpeed: 2.5 // radian per sec
     });
 
+    function addRandomPeople () {
+      var people = new G.People({
+        x: Math.random()*window.innerWidth,
+        y: Math.random()*window.innerHeight,
+        width: 80,
+        height: 80,
+        sex: Math.random()>.5 ? "m" : "f",
+        model: Math.floor(Math.random()*4)
+      });
+      var ai = new G.PeopleAI({
+        endurance: 10,
+          speed: 80+Math.round(40*Math.random())
+      });
+      ai.opponents.push(player);
+      people.setAI(ai);
+      game.people.push(people);
+    }
+
+    for (var i=0; i<10; ++i)
+      addRandomPeople();
+
+    var i = 0;
     function update () {
       controls.update(player);
+
+      if (i++%20==0) {
+        addRandomPeople();
+      }
+
+      game.people.each(function (people) {
+        people.update();
+      });
     }
 
     $(window).on("mousedown", function () {
@@ -60,7 +91,7 @@
 
     controls.on("change", function () {
       if (controls.hasChanged("pointer")) {
-        game.playerLight.roughness = G.clamp(0, 0.95, controls.distanceWithPointer(player)/400);
+        game.playerLight.roughness = G.clamp(0, 0.7, controls.distanceWithPointer(player)/400);
       }
     });
 
