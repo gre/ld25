@@ -46,6 +46,7 @@
     });
 
     function update () {
+      player.tongue = Math.max(0, Math.cos(+new Date()/100));
       controls.update(player);
     }
 

@@ -188,6 +188,8 @@ G.Map = Backbone.Model.extend({
       ];
       this.lastSpriteTime = +new Date();
       this.lastSprite = 1;
+      this.tongue = 0; /* from 0 to 1 */
+      this.tongueDistance = 200;
     },
     imageId: function () {
       var i = 0;
@@ -200,6 +202,33 @@ G.Map = Backbone.Model.extend({
         }
       }
       return this.sprites[i];
+    },
+    render: function (ctx, camera) {
+      // Render the tongue
+      if (this.tongue) {
+        var width = this.get("width");
+
+        var TONGUE_X = Math.round(width/5), 
+            TONGUE_Y = Math.round(width/80),
+            TONGUE_W = Math.round(width/6);
+        var tongueLength = this.tongueDistance - TONGUE_X;
+        var length = Math.round(this.tongue*tongueLength);
+        var angle = this.get("angle");
+        ctx.save();
+        ctx.strokeStyle = "#d31744";
+        ctx.lineWidth = TONGUE_W;
+        ctx.lineCap = "round";
+        ctx.translate(this.x, this.y);
+        ctx.rotate(-angle);
+        ctx.beginPath();
+        ctx.moveTo(TONGUE_X, TONGUE_Y);
+        ctx.lineTo(TONGUE_X+length, TONGUE_Y);
+        ctx.stroke();
+        ctx.closePath();
+        ctx.restore();
+      }
+      // Render the monster
+      G.Character.prototype.render.apply(this, arguments);
     }
   });
 
