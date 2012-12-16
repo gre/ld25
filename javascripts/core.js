@@ -62,11 +62,58 @@ function perlinNoise(canvas, force, noise) {
     return canvas;
 }
 
+G.Building = Backbone.Model.extend({
+  getSize: function () {
+    return {
+      width: this.get("width"),
+      height: this.get("height")
+    }
+  },
+  getOpaqueObject: function (camera) {
+    var p = camera.realPositionToCanvas(this.getPosition());
+    var size = this.getSize();
+    var topleft = new illuminated.Vec2(p.x, p.y);
+    var bottomright = new illuminated.Vec2(p.x+size.width, p.y+size.height);
+    return new illuminated.RectangleObject({ 
+      topleft: topleft,
+      bottomright: bottomright
+    });
+  },
+  getPosition: function () {
+    return {
+      x: this.get("x"),
+      y: this.get("y")
+    }
+  }
+})
+
 G.Map = Backbone.Model.extend({
   initialize: function () {
     var w = this.get("width"), h = this.get("height");
     this.floorTexture = createCanvas(w, h);
+    this.buildings = new Backbone.Collection();
+  },
+
+  addBuilding: function (b) {
+    this.buildings.push(b);
+  },
+
+  findRandomPlace: function (size) {
+    size = size || 0;
+    var pos = {};
+    do {
+      pos.x = (0.1+0.8*Math.random()) * this.get("width");
+      pos.y = (0.1+0.8*Math.random()) * this.get("height");
+    }
+    while (!this.validPosition(pos, size/3));
+    return pos;
+  },
+
+  compute: function () {
+    var w = this.get("width"), h = this.get("height");
     var ctx = this.floorTexture.getContext("2d");
+
+    ctx.save();
     ctx.fillStyle = "#234";
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -82,13 +129,39 @@ G.Map = Backbone.Model.extend({
       return [r,g,b];
     }));
     ctx.drawImage(n2, 0, 0);
+
+    var buildingTexture = createCanvas(w, h);
+    perlinNoise(buildingTexture, 2000, randomNoise(createCanvas(w, h), 0, 0, w, h, 255, function () {
+      var v = Math.random()*50;
+      return [v,v,v];
+    }));
+
+    ctx.beginPath();
+    this.buildings.each(function (building) {
+      var pos = building.getPosition();
+      var size = building.getSize();
+      ctx.rect(pos.x, pos.y, size.width, size.height);
+    });
+    ctx.clip();
+    ctx.drawImage(buildingTexture, 0, 0);
+
+    ctx.restore();
   },
   
   validPosition: function (p, radius) {
     radius = radius || 0;
     if (p.x<radius || this.get("width")-radius<p.x
      || p.y<radius || this.get("height")-radius<p.y) return false;
-    return true;
+    var noCollisionsWithBuilding = 
+      this.buildings.every(function (building) {
+        var pos = building.getPosition();
+        var size = building.getSize();
+        if (pos.x-radius < p.x && p.x <pos.x+size.width+radius
+         && pos.y-radius < p.y && p.y <pos.y+size.height+radius)
+          return false;
+        return true;
+      });
+    return noCollisionsWithBuilding;
   }
 });
 
@@ -126,23 +199,24 @@ G.Map = Backbone.Model.extend({
     setPlayer: function (p) {
       this.player = p;
     },
-        
+
     addRandomPeople: function () {
-      var x = (0.1+0.8*Math.random()) * this.map.get("width");
-      var y = (0.1+0.8*Math.random()) * this.map.get("height");
+      var size = Math.round(75 + 10*Math.random());
+      var pos = this.map.findRandomPlace(size);
+
       var people = new G.People({
-        x: x,
-        y: y,
+        x: pos.x,
+        y: pos.y,
         angle: 2*Math.PI*Math.random(),
-        width: 80,
-        height: 80,
+        speed: size+Math.round((size/2)*Math.random()),
+        width: size,
+        height: size,
         sex: Math.random()>.5 ? "m" : "f",
         model: Math.floor(Math.random()*4)
       });
 
       var ai = new G.PeopleAI({
-        reactionTime: 700+Math.round(1000*Math.random()),
-        speed: 80+Math.round(40*Math.random())
+        reactionTime: 700+Math.round(1000*Math.random())
       });
       // FIXME TODO: give the AI a way to check if there are collisions 
       // + out of bounds : functions?
@@ -173,6 +247,9 @@ G.Map = Backbone.Model.extend({
       // Generate opaque objects
       var lighting = this.lighting;
       lighting.objects = [];
+      this.map.buildings.each(function (building) {
+        lighting.objects.push(building.getOpaqueObject(camera));
+      });
       this.people.each(function (people) {
         if (!people.isCaught())
           lighting.objects.push(people.getOpaqueObject(camera));
@@ -187,7 +264,9 @@ G.Map = Backbone.Model.extend({
       if (!this.lastPeopleAdd) this.lastPeopleAdd = now;
       if (now-this.lastPeopleAdd > 1000) {
         this.lastPeopleAdd = now;
-        this.addRandomPeople();
+        if (this.people.size() < this.get("maxPeople")) {
+          this.addRandomPeople();
+        }
       }
     },
 
@@ -730,7 +809,7 @@ G.Map = Backbone.Model.extend({
     },
     speed: function (entity) {
       if (this.stopped || this.caught) return 0;
-      var speed = this.get("speed");
+      var speed = entity.get("speed");
       if (this.running)
         speed *= this.runFactor;
       return speed;

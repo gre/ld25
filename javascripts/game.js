@@ -24,11 +24,29 @@
     var canvas = $("canvas.game")[0];
     var ctx = canvas.getContext("2d");
 
-    var game = new G.Game();
+    var game = new G.Game({
+      maxPeople: 40
+    });
     var map = G.map = new G.Map({
       width: 2000,
       height: 2000
     });
+
+    for (var x=100; x<2000; x += 500) {
+      for (var y=100; y<2000; y += 500) {
+        if (Math.random() < 0.4) {
+          map.addBuilding(new G.Building({
+            x: x,
+            y: y,
+            width: 300,
+            height: Math.random()>0.8 ? 200 : (Math.random()>0.6 ? 400 : 600)
+          }));
+        }
+      }
+    }
+
+    map.compute();
+    
     game.setMap(map);
     var camera = new G.Camera({
       x: 0,
@@ -37,15 +55,16 @@
     });
     camera.setWorldSize(map.get("width"), map.get("height"));
     var player = new G.Monster({
-      x: map.get("width")/2,
-      y: map.get("height")/2,
-      width: 220,
-      height: 220,
+      width: 250,
+      height: 250,
       vitalWidth: 100,
       angle: 0,
       tongueDistance: 200,
       slimSpeed: 2
     });
+    var playerPos = map.findRandomPlace(250);
+    player.x = playerPos.x;
+    player.y = playerPos.y;
     game.setPlayer(player);
 
     var controls = new G.PlayerControls({
@@ -85,7 +104,7 @@
 
     // Custom events
     player.on("eat", function (people) {
-      player.grow(4+Math.round(2*Math.random()));
+      player.grow(Math.round(people.get("width")/20+2*Math.random()));
 
       people._watchPlayerMove && player.off("move", people._watchPlayerMove);
       people.destroy();
@@ -110,6 +129,12 @@
 
     player.on("grow", function () {
       var d = this.get("tongueDistance");
+      var maxPeople = Math.max(10, 80-Math.round(d/5));
+      var slimSpeed = 1+10*Math.round(d/150)/10;
+
+      game.set("maxPeople", maxPeople);
+      player.set("slimSpeed", slimSpeed);
+
       /*
       // FIXME make it working
       var zoom = Math.max(1, Math.round(d/200));
@@ -137,7 +162,7 @@
 
     // Initial game state
     player.opacity = 0;
-    for (var i=0; i<20; ++i)
+    for (var i=0; i<game.get("maxPeople"); ++i)
       game.addRandomPeople();
     game.darkmask.color = "rgba(0,0,0,0)";
     game.withLights = false;
