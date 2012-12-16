@@ -72,12 +72,32 @@ G.Map = Backbone.Model.extend({
         height: 2000
       });
     },
-
-    setViewport: function (w, h) {
-    },
     
     setPlayer: function (p) {
       this.player = p;
+    },
+        
+    addRandomPeople: function () {
+      var people = new G.People({
+        x: Math.random()*window.innerWidth,
+        y: Math.random()*window.innerHeight,
+        width: 80,
+        height: 80,
+        sex: Math.random()>.5 ? "m" : "f",
+        model: Math.floor(Math.random()*4)
+      });
+      var ai = new G.PeopleAI({
+        endurance: 10,
+        speed: 80+Math.round(40*Math.random())
+      });
+      people.setAI(ai);
+      this.people.push(people);
+    },
+
+    makePeopleAwareOfPlayer: function (player) {
+      this.people.each(function (people) {
+        people.ai.opponents.push(player);
+      });
     },
 
     updateIlluminatedScene: function (ctx, camera) {
@@ -127,6 +147,7 @@ G.Map = Backbone.Model.extend({
     },
     render: function (ctx, camera) {
       this.updateIlluminatedScene(ctx, camera);
+      ctx.save();
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       this.renderFloor(ctx, camera);
       this.renderLights(ctx, camera);
@@ -135,18 +156,36 @@ G.Map = Backbone.Model.extend({
       });
       this.player && this.player.render(ctx, camera);
       this.renderFog(ctx, camera);
+      ctx.restore();
     }
   });
 
   G.Camera = Backbone.Model.extend({
     initialize: function () {
       var self = this;
+      this.shaking = 0;
+      this.shakingInterval = 80;
     },
     setSize: function (w, h) {
       var w = window.innerWidth;
       var h = window.innerHeight;
       this.set("w", w);
       this.set("h", h);
+    },
+    shake: function () {
+      var now = +new Date();
+      var last = this.lastShake || 0;
+      if (now-last > this.shakingInterval) {
+        this.lastShake = now;
+        this.shakex = this.shaking*(2*Math.random()-1);
+        this.shakey = this.shaking*(2*Math.random()-1);
+      }
+    },
+    getX: function () {
+      return this.x+this.shakex;
+    },
+    getY: function () {
+      return this.y+this.shakey;
     }
   });
 
@@ -156,8 +195,21 @@ G.Map = Backbone.Model.extend({
       this.y = this.get("y");
       this.width = this.get("width");
       this.height = this.get("height");
+      this.opacity = 1;
+      this.shaking = 0;
+      this.shakingInterval = 200;
+    },
+    shake: function () {
+      var now = +new Date();
+      var last = this.lastShake || 0;
+      if (now-last > this.shakingInterval) {
+        this.lastShake = now;
+        this.shakex = this.shaking*(2*Math.random()-1);
+        this.shakey = this.shaking*(2*Math.random()-1);
+      }
     },
     render: function (ctx, camera) {
+      if (!this.opacity) return;
       var angle = this.get("angle");
       var sprite = this.sprite();
       var image = sprite.image;
@@ -169,8 +221,16 @@ G.Map = Backbone.Model.extend({
       var spritey = sprite.y||0;
       var spritew = sprite.w||image.width;
       var spriteh = sprite.h||image.height;
+      var x = this.x;
+      var y = this.y;
+      if (this.shaking) {
+        this.shake();
+        x += this.shakex;
+        y += this.shakey;
+      }
       ctx.save();
-      ctx.translate(Math.round(this.x), Math.round(this.y));
+      ctx.globalAlpha = this.opacity;
+      ctx.translate(Math.round(x), Math.round(y));
       angle && ctx.rotate(-angle);
       ctx.drawImage(image, 
         spritex, spritey, spritew, spriteh,

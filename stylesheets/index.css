@@ -6,11 +6,11 @@ body {
 }
 
 #wrapper {
-  width: 600px;
+  width: 800px;
   margin: 0 auto;
 }
 
 #viewport {
-  width: 600px;
-  height: 400px;
+  width: 800px;
+  height: 500px;
 }

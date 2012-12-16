@@ -16,6 +16,8 @@
   function game () {
     stage("game");
    
+    // INIT GAME
+
     var canvas = $("canvas.game")[0];
     var ctx = canvas.getContext("2d");
 
@@ -33,8 +35,6 @@
       tongueDistance: 200
     });
 
-    window.player = player;
-
     game.setPlayer(player);
 
     var controls = new G.PlayerControls({
@@ -47,34 +47,6 @@
       rotationSpeed: 5 // radian per sec
     });
 
-    function addRandomPeople () {
-      var people = new G.People({
-        x: Math.random()*window.innerWidth,
-        y: Math.random()*window.innerHeight,
-        width: 80,
-        height: 80,
-        sex: Math.random()>.5 ? "m" : "f",
-        model: Math.floor(Math.random()*4)
-      });
-      var ai = new G.PeopleAI({
-        endurance: 10,
-          speed: 80+Math.round(40*Math.random())
-      });
-      ai.opponents.push(player);
-      people.setAI(ai);
-      game.people.push(people);
-    }
-
-    for (var i=0; i<10; ++i)
-      addRandomPeople();
-
-    var i = 0;
-    function update () {
-      controls.update(player);
-      game.people.each(function (people) {
-        people.update();
-      });
-    }
 
     $(window).on("mousedown", function () {
       player.tongueOut(player.tongueSpeedOut);
@@ -101,6 +73,47 @@
     $(window).on("resize", function () {
       setViewport(window.innerWidth, window.innerHeight);
     });
+
+    var timeline = new G.Timeline();
+
+
+    timeline.
+      once(0, function () {
+        player.opacity = 0;
+        for (var i=0; i<10; ++i)
+          game.addRandomPeople();
+      }).
+      between(1000, 3000, {
+        start: function(){
+          game.makePeopleAwareOfPlayer(player);
+        },
+        loop: function () {
+          player.opacity = G.smoothstep(1000, 3000, timeline.time());
+          camera.shaking = 100*(1-G.smoothstep(1000, 3000, timeline.time()));
+        },
+        stop: function(){
+          player.opacity = 1;
+          camera.shaking = 0;
+        }
+      }).
+      between(1500, 2000, {
+        loop: function (t, p) {
+          //console.log("phase2", t, p);
+        }
+      }).
+      after(2500, { loop: function (t) {
+        console.log("---");
+      }});
+
+
+    function update () {
+      timeline.update();
+
+      controls.update(player);
+      game.people.each(function (people) {
+        people.update();
+      });
+    }
 
     (function loop () {
       requestAnimationFrame(loop, game.canvas);
