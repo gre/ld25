@@ -18,6 +18,13 @@ a:hover {
   color: #e71;
 }
 
+a.button {
+  text-decoration: none;
+  border: 2px solid #c50;
+  padding: 5px 20px;
+  border-radius: 10px;
+}
+
 #viewport {
 }
 
@@ -108,20 +115,33 @@ a:hover {
   position: absolute;
   top: 0;
   left: 49%;
+  font-size: 2em;
 }
 
 #gameOver .time {
   color: #F99;
 }
 
-#lifespan .seconds {
+#eats {
+  z-index: 2;
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  font-weight: 1em;
+}
+
+#lifespan {
   z-index: 2;
   position: absolute;
   top: 10px;
   right: 10px;
   font-weight: 4em;
 }
-#lifespan .seconds.critic {
+#lifespan.critic {
   color: #F33;
   font-weight: 6em;
+}
+
+#start {
+  font-size: 3em;
 }

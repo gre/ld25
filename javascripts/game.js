@@ -16,9 +16,16 @@
     $('#'+id).show().siblings('.stage').hide();
   }
 
+  function beforeGame () {
+    stage("beforeGame");
+    $("#start").one("click", function (e) {
+      e.preventDefault();
+      $(this).css("opacity", 0.5);
+      game();
+    });
+  }
+
   function game () {
-    stage("game");
-   
     // INIT GAME
 
     var canvas = $("canvas.game")[0];
@@ -31,10 +38,9 @@
       width: 2000,
       height: 2000
     });
-
-    for (var x=100; x<2000; x += 500) {
-      for (var y=100; y<2000; y += 500) {
-        if (Math.random() < 0.4) {
+    for (var x=0; x<2000; x += 600) {
+      for (var y=0; y<2000; y += 600) {
+        if (Math.random() < 0.3) {
           map.addBuilding(new G.Building({
             x: x,
             y: y,
@@ -44,7 +50,6 @@
         }
       }
     }
-
     map.compute();
     
     game.setMap(map);
@@ -104,6 +109,8 @@
 
     // Custom events
     player.on("eat", function (people) {
+      player.eatCount = (player.eatCount||0)+1;
+      setEatCount(player.eatCount);
       player.grow(Math.round(people.get("width")/20+2*Math.random()));
 
       people._watchPlayerMove && player.off("move", people._watchPlayerMove);
@@ -309,7 +316,13 @@
     function setLifespan (seconds) {
       if (lifespan === seconds) return;
       lifespan = seconds;
-      $lifespan_seconds.toggleClass("critic", seconds<10).text(""+seconds);
+      $lifespan.toggleClass("critic", seconds<10);
+      $lifespan_seconds.text(""+seconds);
+    }
+
+    var $eatCount = $(".eatCount");
+    function setEatCount (count) {
+      $eatCount.text(count);
     }
 
     var gameOver = false;
@@ -324,6 +337,8 @@
       timeline.update();
     }
 
+    stage("game");
+   
     (function loop () {
       if (gameOver) return;
       requestAnimationFrame(loop, game.canvas);
@@ -351,7 +366,7 @@
 
     });
     loader.once("loaded", function(){
-      game();
+      beforeGame();
     });
     loader.load();
   }

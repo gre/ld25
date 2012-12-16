@@ -16,6 +16,13 @@
       <ul class="error"></ul>
     </div>
 
+    <div id="beforeGame" class="stage">
+      <header>
+        <h1>Ready?</h1>
+      </header>
+      <a href="#" id="start" class="button">Start</a>
+    </div>
+
     <div id="game" class="stage">
       <div id="story" style="display: none">
         <h1>Once Upon A Time<span class="points"></span></h1>
@@ -24,8 +31,13 @@
       <div id="ui">
         <div id="time" class="time"></div>
         <div id="lifespan">
-          <span class="seconds"></span>
+          <span class="seconds"></span> s
         </div>
+        <div id="eats">
+          &#x1f374;
+          <span class="eatCount">0</span>
+        </div>
+
       </div>
       <canvas class="game"></canvas>
     </div>
@@ -34,7 +46,10 @@
     <div id="gameOver" class="stage">
       <h1>Game Over</h1>
       <h2>You survive during <span class="time"></span>!</h2>
-      <p>You must eat enough people to stay alive!</p>
+      <h2>And eat 
+      <span class="eatCount">0</span> People!
+      </h2>
+      <p>Try again and eat more people to stay alive!</p>
       <p>
         <a href="#" id="tryAgain">Try Again</a>
       </p>

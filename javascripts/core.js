@@ -74,6 +74,7 @@ G.Building = Backbone.Model.extend({
     var size = this.getSize();
     var topleft = new illuminated.Vec2(p.x, p.y);
     var bottomright = new illuminated.Vec2(p.x+size.width, p.y+size.height);
+
     return new illuminated.RectangleObject({ 
       topleft: topleft,
       bottomright: bottomright
@@ -91,6 +92,7 @@ G.Map = Backbone.Model.extend({
   initialize: function () {
     var w = this.get("width"), h = this.get("height");
     this.floorTexture = createCanvas(w, h);
+    this.buildingsTexture = createCanvas(w, h);
     this.buildings = new Backbone.Collection();
   },
 
@@ -110,10 +112,16 @@ G.Map = Backbone.Model.extend({
   },
 
   compute: function () {
+    this.computeFloor();
+    this.computeBuildings();
+  },
+
+  computeFloor: function () {
     var w = this.get("width"), h = this.get("height");
     var ctx = this.floorTexture.getContext("2d");
 
     ctx.save();
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.fillStyle = "#234";
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -129,6 +137,12 @@ G.Map = Backbone.Model.extend({
       return [r,g,b];
     }));
     ctx.drawImage(n2, 0, 0);
+    ctx.restore();
+  },
+
+  computeBuildings: function () {
+    var w = this.get("width"), h = this.get("height");
+    var ctx = this.buildingsTexture.getContext("2d");
 
     var buildingTexture = createCanvas(w, h);
     perlinNoise(buildingTexture, 2000, randomNoise(createCanvas(w, h), 0, 0, w, h, 255, function () {
@@ -136,6 +150,8 @@ G.Map = Backbone.Model.extend({
       return [v,v,v];
     }));
 
+    ctx.save();
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.beginPath();
     this.buildings.each(function (building) {
       var pos = building.getPosition();
@@ -144,7 +160,6 @@ G.Map = Backbone.Model.extend({
     });
     ctx.clip();
     ctx.drawImage(buildingTexture, 0, 0);
-
     ctx.restore();
   },
   
@@ -302,6 +317,14 @@ G.Map = Backbone.Model.extend({
       ctx.drawImage(this.map.floorTexture, 0, 0);
       ctx.restore();
     },
+
+    renderBuildings: function (ctx, camera) {
+      ctx.save();
+      camera.translateContext(ctx);
+      ctx.drawImage(this.map.buildingsTexture, 0, 0);
+      ctx.restore();
+    },
+
     render: function (ctx, camera) {
       this.updateIlluminatedScene(ctx, camera);
       ctx.save();
@@ -317,6 +340,7 @@ G.Map = Backbone.Model.extend({
         if (people.isCaught())
           people.render(ctx, camera);
       });
+      this.renderBuildings(ctx, camera);
       this.renderFog(ctx, camera);
       ctx.restore();
     }
