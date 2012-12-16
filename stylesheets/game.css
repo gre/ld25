@@ -5,6 +5,12 @@ html, body {
   font-family: "Freckle Face";
 }
 
+* {
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+}
+
 a {
   color: #c50;
 }
@@ -98,3 +104,14 @@ a:hover {
   -webkit-transform: translateY(0px) scale(1);
 }
 
+#lifespan .seconds {
+  z-index: 2;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-weight: 4em;
+}
+#lifespan .seconds.critic {
+  color: #F33;
+  font-weight: 6em;
+}

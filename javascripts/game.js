@@ -37,14 +37,15 @@
     });
     camera.setWorldSize(map.get("width"), map.get("height"));
     var player = new G.Monster({
-      x: window.innerWidth/2,
-      y: window.innerHeight/2,
+      x: map.get("width")/2,
+      y: map.get("height")/2,
       width: 150,
       height: 150,
+      vitalWidth: 50,
       angle: 0,
-      tongueDistance: 200
+      tongueDistance: 200,
+      slimSpeed: 5
     });
-
     game.setPlayer(player);
 
     var controls = new G.PlayerControls({
@@ -58,13 +59,7 @@
     });
     controls.setCamera(camera);
 
-    $(window).on("mousedown", function () {
-      player.tongueOut(player.tongueSpeedOut);
-    });
-
-    $(window).on("mouseup", function () {
-      player.tongueIn(player.tongueSpeedIn);
-    });
+    // DOM Events
 
     controls.on("change", function () {
       if (controls.hasChanged("pointer")) {
@@ -82,6 +77,32 @@
     setViewport(window.innerWidth, window.innerHeight);
     $(window).on("resize", function () {
       setViewport(window.innerWidth, window.innerHeight);
+    });
+
+    // Custom events
+    player.on("eat", function (people) {
+      player.grow(10+Math.round(5*Math.random()));
+
+      people._watchPlayerMove && player.off("move", people._watchPlayerMove);
+      people.destroy();
+    });
+    player.on("catch", function (people) {
+      people.ai.stopped = true;
+      people.ai.blocked = true;
+      people.shakingInterval = 40;
+      people.shaking = 10;
+      var dist = player.currentTongueLength();
+      people._watchPlayerMove = function (player) {
+        var angle = player.get("angle");
+        people.x = player.x+dist*Math.cos(-angle);
+        people.y = player.y+dist*Math.sin(-angle);
+      }
+      player.on("move", people._watchPlayerMove);
+    });
+
+    player.on("die", function () {
+      player.destroy();
+      end();
     });
 
     // Initial game state
@@ -153,7 +174,6 @@
         },
         loop: function (t, p) {
           player.opacity = p;
-          camera.shaking = 100*(1-p);
           player.set({
             width: 300-150*p,
             height: 300-150*p
@@ -161,7 +181,6 @@
         },
         stop: function(){
           player.opacity = 1;
-          camera.shaking = 0;
           player.set({
             width: 150,
             height: 150
@@ -172,7 +191,7 @@
       after(2000, { 
         loop: function (t) {
           controls.update(player);
-          camera.focusOn(player.getPosition());
+          setLifespan(Math.round(player.getLifespan()));
         }
       });
 
@@ -180,6 +199,20 @@
     var timeline = new G.Timeline();
 
     timeline
+      .between(2500, 5500, {
+        start: function () {
+          camera.shakingInterval = 50;
+        },
+        loop: function (t, p) {
+          var s = 30*p;
+          s *= (1-G.smoothstep(4000, 5500, t));
+          camera.shaking = s;
+          camera.shake();
+        },
+        stop: function () {
+          camera.shaking = 0;
+        }
+      })
       .once(0, function () {
         storyStart.start();
       })
@@ -194,16 +227,34 @@
       .always({
         loop: function () {
           game.update();
+          camera.focusOn(player.getPosition());
         }
       })
       .start();
 
+    var lifespan;
+    var $lifespan = $("#lifespan");
+    var $lifespan_seconds = $lifespan.find(".seconds");
+    function setLifespan (seconds) {
+      if (lifespan === seconds) return;
+      lifespan = seconds;
+      $lifespan_seconds.toggleClass("critic", seconds<10).text(""+seconds);
+    }
+
+    var gameOver = false;
+    function end () {
+      gameOver = true;
+      stage("gameOver");
+    }
+
     function update () {
+      if (gameOver) return;
       storyStart.update();
       timeline.update();
     }
 
     (function loop () {
+      if (gameOver) return;
       requestAnimationFrame(loop, game.canvas);
       window.stats && stats.begin();
       update();
@@ -233,6 +284,12 @@
     });
     loader.load();
   }
+
+  
+  $("#tryAgain").click(function(e){
+    e.preventDefault();
+    window.location.reload();
+  });
 
   $(document).ready(function() {
     loading();

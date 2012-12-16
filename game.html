@@ -21,7 +21,22 @@
         <h1>Once Upon A Time<span class="points"></span></h1>
         <h2>In a Peaceful City<span class="points"></span></h2>
       </div>
+      <div id="ui">
+        <div id="lifespan">
+          <span class="seconds"></span>
+        </div>
+      </div>
       <canvas class="game"></canvas>
+    </div>
+
+    
+    <div id="gameOver" class="stage">
+      <h1>Game Over</h1>
+      <h2>You die!</h2>
+      <p>You must eat enough people to stay alive!</p>
+      <p>
+        <a href="#" id="tryAgain">Try Again</a>
+      </p>
     </div>
 
   </div>
@@ -46,6 +61,7 @@ document.body.appendChild( stats.domElement );
   <script type="text/javascript" src="vendors/backbone-min.js"></script>
   <script type="text/javascript" src="vendors/Box2dWeb-2.1.a.3.js"></script>
   <script type="text/javascript" src="vendors/illuminated.js"></script>
+
   <!-- the game -->
   <script type="text/javascript">
     window.game={};
