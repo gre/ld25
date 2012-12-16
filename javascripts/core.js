@@ -739,10 +739,10 @@ G.Map = Backbone.Model.extend({
       var backward = this.isDown(keys.backward);
       var speed = 0;
       if (forward && !backward) {
-        speed = this.get("forwardSpeed");
+        speed = this.get("forwardSpeed").call(entity);
       }
       else if (backward) {
-        speed = -this.get("backwardSpeed");
+        speed = -this.get("backwardSpeed").call(entity);
       }
       var pointer = this.get("pointer");
       if (!backward && pointer) {

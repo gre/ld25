@@ -104,6 +104,16 @@ a:hover {
   -webkit-transform: translateY(0px) scale(1);
 }
 
+#time {
+  position: absolute;
+  top: 0;
+  left: 49%;
+}
+
+#gameOver .time {
+  color: #F99;
+}
+
 #lifespan .seconds {
   z-index: 2;
   position: absolute;

@@ -39,9 +39,9 @@
     var player = new G.Monster({
       x: map.get("width")/2,
       y: map.get("height")/2,
-      width: 150,
-      height: 150,
-      vitalWidth: 50,
+      width: 200,
+      height: 200,
+      vitalWidth: 80,
       angle: 0,
       tongueDistance: 200,
       slimSpeed: 5
@@ -53,8 +53,12 @@
         forward: 38,
         backward: 40
       },
-      forwardSpeed: 200, // pixel per sec
-      backwardSpeed: 100, // pixel per sec
+      forwardSpeed: function(){ 
+        return 200*this.get("tongueDistance")/200 
+      }, // pixel per sec
+      backwardSpeed: function(){ 
+        return 100*this.get("tongueDistance")/200 
+      }, // pixel per sec
       rotationSpeed: 5 // radian per sec
     });
     controls.setCamera(camera);
@@ -224,13 +228,29 @@
           playerEnterInGame.update();
         }
       })
+      .after(5000, {
+        loop: function (t) {
+          setTime(Math.round((t-5000)/1000));
+        }
+      })
       .always({
-        loop: function () {
+        loop: function (t) {
           game.update();
           camera.focusOn(player.getPosition());
         }
       })
       .start();
+
+      
+    var time;
+    var $time = $(".time");
+    function setTime (seconds) {
+      if (time === seconds) return;
+      time = seconds;
+      var mm = Math.floor(seconds/60); if(mm<=9) mm = "0"+mm;
+      var ss = seconds%60; if(ss<=9) ss = "0"+ss;
+      $time.text(mm+":"+ss);
+    }
 
     var lifespan;
     var $lifespan = $("#lifespan");
