@@ -8,6 +8,9 @@
     people_f: { src: "images/women.png" }
   }, IMAGES_TOTAL_BYTES);
   
+  var sounds = new G.Sounds({
+    monsterScream: ""
+  });
 
   function stage (id) {
     $('#'+id).show().siblings('.stage').hide();
@@ -21,7 +24,7 @@
     var canvas = $("canvas.game")[0];
     var ctx = canvas.getContext("2d");
 
-    var game = new G.Game();
+    var game = G.instance = new G.Game();
     var camera = new G.Camera({
       x: 0,
       y: 0
@@ -83,41 +86,69 @@
         for (var i=0; i<10; ++i)
           game.addRandomPeople();
       }).
-      between(1000, 3000, {
-        start: function(){
-          game.makePeopleAwareOfPlayer(player);
+      between(0, 2000, {
+        start: function () {
+          game.darkmask.color = "rgba(0,0,0,0)";
+          game.withLights = false;
         },
         loop: function () {
-          player.opacity = G.smoothstep(1000, 3000, timeline.time());
-          camera.shaking = 100*(1-G.smoothstep(1000, 3000, timeline.time()));
+          var alpha = Math.round(90*G.smoothstep(2000, 3000, timeline.time()))/100;
+          game.darkmask.color = "rgba(0,0,0,"+alpha+")";
+        },
+        stop: function () {
+          game.darkmask.color = "rgba(0,0,0,0.9)";
+          game.withLights = true;
+        }
+      }).
+      once(1500, function () {
+        game.makePeopleAwareOfPlayer(player);
+        sounds.play("monsterScream", 0.8);
+      }).
+      between(1000, 2000, {
+        start: function(){
+          player.set({
+            width: 300,
+            height: 300
+          });
+        },
+        loop: function (t, p) {
+          //var p = G.smoothstep(1000, 2500, timeline.time());
+          player.opacity = p;
+          camera.shaking = 100*(1-p);
+          player.set({
+            width: 300-150*p,
+            height: 300-150*p
+          });
         },
         stop: function(){
           player.opacity = 1;
           camera.shaking = 0;
+          player.set({
+            width: 150,
+            height: 150
+          });
         }
       }).
-      between(1500, 2000, {
-        loop: function (t, p) {
-          //console.log("phase2", t, p);
+      // Update functions
+      before(2000, {
+        loop: function () {
+          game.update();
         }
       }).
-      after(2500, { loop: function (t) {
-        console.log("---");
-      }});
+      after(2000, { 
+        loop: function (t) {
+          controls.update(player);
+          game.update();
+        }
+      });
 
 
     function update () {
-      timeline.update();
-
-      controls.update(player);
-      game.people.each(function (people) {
-        people.update();
-      });
     }
 
     (function loop () {
       requestAnimationFrame(loop, game.canvas);
-      update();
+      timeline.update();
       game.render(ctx, camera);
     }());
     

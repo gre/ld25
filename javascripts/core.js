@@ -53,10 +53,10 @@ G.Map = Backbone.Model.extend({
   initialize: function () {
     var w = this.get("width"), h = this.get("height");
     var perlinCanvas = createCanvas(w, h);
-    perlinNoise(perlinCanvas, 500, randomNoise(createCanvas(w, h), 0, 0, w, h, 10));
+    perlinNoise(perlinCanvas, 1000, randomNoise(createCanvas(w, h), 0, 0, w, h, 5));
     this.floorTexture = createCanvas(w, h);
     var ctx = this.floorTexture.getContext("2d");
-    ctx.fillStyle = "#857d74";
+    ctx.fillStyle = "#234";
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.drawImage(perlinCanvas, 0, 0);
   }
@@ -71,6 +71,25 @@ G.Map = Backbone.Model.extend({
         width: 2000,
         height: 2000
       });
+      
+      this.playerLight = new Lamp({
+        color: "rgba(240,220,180,0.8)",
+        radius: 0,
+        samples: 1,
+        roughness: 0.9
+      });
+
+      this.lighting = new Lighting({
+        light: this.playerLight,
+        objects: []
+      });
+
+      this.darkmask = new DarkMask({ lights: [
+          this.playerLight
+        ] 
+      });
+
+      this.withLights = true;
     },
     
     setPlayer: function (p) {
@@ -97,27 +116,11 @@ G.Map = Backbone.Model.extend({
     makePeopleAwareOfPlayer: function (player) {
       this.people.each(function (people) {
         people.ai.opponents.push(player);
+        people.ai.decide(people);
       });
     },
 
     updateIlluminatedScene: function (ctx, camera) {
-      if (this.player && !this.playerLight) {
-        this.playerLight = new Lamp({
-            color: "rgba(240,220,180,0.8)",
-            radius: 0,
-            samples: 1,
-            roughness: 0.9
-        });
-      }
-      if (!this.lighting) {
-        this.lighting = new Lighting({
-          light: this.playerLight,
-          objects: []
-        });
-      }
-      if (!this.darkmask) {
-        this.darkmask = new DarkMask({ lights: [this.playerLight] });
-      }
       this.playerLight.position = new illuminated.Vec2(
         this.player.x,
         this.player.y
@@ -126,6 +129,12 @@ G.Map = Backbone.Model.extend({
       this.playerLight.angle = this.player.get("angle");
       this.lighting.compute(ctx.canvas.width, ctx.canvas.height);
       this.darkmask.compute(ctx.canvas.width, ctx.canvas.height);
+    },
+
+    update: function () {
+      this.people.each(function (people) {
+        people.update();
+      });
     },
 
     renderLights: function (ctx, camera) {
@@ -150,7 +159,7 @@ G.Map = Backbone.Model.extend({
       ctx.save();
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       this.renderFloor(ctx, camera);
-      this.renderLights(ctx, camera);
+      this.withLights && this.renderLights(ctx, camera);
       this.people.each(function (people) {
         people.render(ctx, camera);
       });
@@ -213,8 +222,8 @@ G.Map = Backbone.Model.extend({
       var angle = this.get("angle");
       var sprite = this.sprite();
       var image = sprite.image;
-      var w = this.width||image.width;
-      var h = this.height||image.height;
+      var w = this.get("width")||image.width;
+      var h = this.get("height")||image.height;
       var halfW = Math.round(w/2);
       var halfH = Math.round(h/2);
       var spritex = sprite.x||0;
@@ -282,7 +291,7 @@ G.Map = Backbone.Model.extend({
           }
         }
       }
-      var image = G.loader.getResource("people_"+this.sex, 3*this.width, 4*this.height);
+      var image = G.loader.getResource("people_"+this.sex, 3*this.get("width"), 4*this.get("height"));
       var W = image.width/3;
       var H = image.height/4;
       return {
@@ -321,7 +330,7 @@ G.Map = Backbone.Model.extend({
       }
       var imageId = this.sprites[i];
       return {
-        image: G.loader.getResource(imageId, this.width, this.height)
+        image: G.loader.getResource(imageId, this.get("width"), this.get("height"))
       };
     },
     tongueOut: function (duration) {
@@ -343,7 +352,7 @@ G.Map = Backbone.Model.extend({
       }
       // Render the tongue
       if (this.tongue) {
-        var width = this.width;
+        var width = this.get("width");
 
         var TONGUE_X = Math.round(width/5), 
             TONGUE_Y = Math.round(width/80),

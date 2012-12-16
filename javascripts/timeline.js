@@ -5,6 +5,7 @@
   G.Timeline = function () {
     this.start = +new Date();
     this.updates = [];
+    this.updatesArguments = [];
     this.instants = [];
   }
 
@@ -28,7 +29,7 @@
     }
 
     for (var i=0; i<this.updates.length; ++i)
-      this.updates[i]();
+      this.updates[i].apply(this, this.updatesArguments[i].call(this));
   }
 
   G.Timeline.prototype._addInstant = function (i) {
@@ -43,7 +44,14 @@
     this._addInstant({
       t: after,
       f: function () {
-        loop && this.updates.push(loop);
+        if (loop) {
+          this.updates.push(loop);
+          this.updatesArguments.push(function(){
+            var t = this.time();
+            var p = G.smoothstep(after, before, t);
+            return [ t, p ];
+          });
+        }
         callbacks.start && callbacks.start.apply(this, arguments);
       }
     });
@@ -53,7 +61,10 @@
         f:  function () {
           if (loop) {
             var i = this.updates.indexOf(loop);
-            if (i!==-1) this.updates.splice(i, 1);
+            if (i!==-1) {
+              this.updates.splice(i, 1);
+              this.updatesArguments.splice(i, 1);
+            }
           }
           callbacks.stop && callbacks.stop.apply(this, arguments);
         }
