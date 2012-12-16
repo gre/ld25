@@ -44,7 +44,7 @@
       vitalWidth: 80,
       angle: 0,
       tongueDistance: 200,
-      slimSpeed: 5
+      slimSpeed: 3
     });
     game.setPlayer(player);
 
@@ -90,16 +90,15 @@
       people._watchPlayerMove && player.off("move", people._watchPlayerMove);
       people.destroy();
     });
-    player.on("catch", function (people) {
-      people.ai.stopped = true;
-      people.ai.blocked = true;
-      people.shakingInterval = 40;
-      people.shaking = 10;
-      var dist = player.currentTongueLength();
+    player.on("catch", function (people, distance) {
+      people.ai.caught = true;
+      people.shakingInterval = 100;
+      people.shaking = 5;
+      people.randomAngleOnShake = true;
       people._watchPlayerMove = function (player) {
         var angle = player.get("angle");
-        people.x = player.x+dist*Math.cos(-angle);
-        people.y = player.y+dist*Math.sin(-angle);
+        people.x = player.x+distance*Math.cos(-angle);
+        people.y = player.y+distance*Math.sin(-angle);
       }
       player.on("move", people._watchPlayerMove);
     });
@@ -109,9 +108,18 @@
       end();
     });
 
+    player.on("grow", function () {
+      var d = this.get("tongueDistance");
+      /*
+      // FIXME make it working
+      var zoom = Math.max(1, Math.round(d/200));
+      camera.setScale(zoom);
+      */
+    });
+
     // Initial game state
     player.opacity = 0;
-    for (var i=0; i<30; ++i)
+    for (var i=0; i<60; ++i)
       game.addRandomPeople();
     game.darkmask.color = "rgba(0,0,0,0)";
     game.withLights = false;

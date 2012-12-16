@@ -14,3 +14,14 @@ body {
   width: 800px;
   height: 500px;
 }
+
+a {
+  color: #c50;
+}
+a:hover {
+  color: #e71;
+}
+
+a.openfull {
+  float: right;
+}

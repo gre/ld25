@@ -92,7 +92,7 @@ G.Map = Backbone.Model.extend({
       this.people = new Backbone.Collection();
       
       this.playerLight = new Lamp({
-        color: "rgba(240,220,180,0.8)",
+        color: "rgba(220,180,120,0.9)",
         radius: 0,
         samples: 1,
         roughness: 0.9
@@ -154,13 +154,14 @@ G.Map = Backbone.Model.extend({
         p.x,
         p.y
       );
-      this.playerLight.distance = 1.5*this.player.get("tongueDistance")/scale;
+      this.playerLight.distance = 1.8*this.player.get("tongueDistance")/scale;
       this.playerLight.angle = this.player.get("angle");
       // Generate opaque objects
       var lighting = this.lighting;
       lighting.objects = [];
       this.people.each(function (people) {
-        lighting.objects.push(people.getOpaqueObject(camera));
+        if (!people.isCaught())
+          lighting.objects.push(people.getOpaqueObject(camera));
       });
       lighting.compute(ctx.canvas.width, ctx.canvas.height);
       // 
@@ -172,7 +173,7 @@ G.Map = Backbone.Model.extend({
       if (!this.lastPeopleAdd) this.lastPeopleAdd = now;
       if (now-this.lastPeopleAdd > 1000) {
         this.lastPeopleAdd = now;
-        this.addRandomPeople();
+        //this.addRandomPeople();
       }
     },
 
@@ -181,7 +182,7 @@ G.Map = Backbone.Model.extend({
       this.updatePeople();
       this.people.each(function (people) {
         people.update();
-        if (self.player.tongueCollide(people)) {
+        if (!people.isCaught() && self.player.tongueCollide(people)) {
           self.player.onTongueCatch(people);
         }
       });
@@ -215,9 +216,14 @@ G.Map = Backbone.Model.extend({
       this.renderFloor(ctx, camera);
       this.withLights && this.renderLights(ctx, camera);
       this.people.each(function (people) {
-        people.render(ctx, camera);
+        if (!people.isCaught())
+          people.render(ctx, camera);
       });
       this.player && this.player.render(ctx, camera);
+      this.people.each(function (people) {
+        if (people.isCaught())
+          people.render(ctx, camera);
+      });
       this.renderFog(ctx, camera);
       ctx.restore();
     }
@@ -368,6 +374,8 @@ G.Map = Backbone.Model.extend({
         this.lastShake = now;
         this.shakex = this.shaking*(2*Math.random()-1);
         this.shakey = this.shaking*(2*Math.random()-1);
+        if (this.randomAngleOnShake) 
+          this.set("angle", this.get("angle")+0.5*Math.PI*(Math.random()-0.5));
       }
     },
     render: function (ctx, camera) {
@@ -415,6 +423,9 @@ G.Map = Backbone.Model.extend({
     },
     isRunning: function () {
       return this.ai && this.ai.running;
+    },
+    isCaught: function () {
+      return this.ai && this.ai.caught;
     },
     getOpaqueObject: function (camera) {
       var p = camera.realPositionToCanvas(this.getPosition());
@@ -477,11 +488,17 @@ G.Map = Backbone.Model.extend({
       this.tongueSpeedOut = 10;
       this.tongueSpeedIn = 10;
       this.eatDistance = this.get("width")/3;
+
+      this.caughtPeople = new Backbone.Collection();
     },
     grow: function (factor) {
       this.set("tongueDistance", factor+this.get("tongueDistance"));
       this.set("width", factor+this.get("width"));
       this.set("height", factor+this.get("height"));
+      if (factor > 0)
+        this.trigger("grow", factor);
+      else
+        this.trigger("slim", -factor);
     },
     slim: function (factor) {
       this.grow(-factor);
@@ -522,7 +539,6 @@ G.Map = Backbone.Model.extend({
 
     currentTongueLength: function () {
       var distance = this.get("tongueDistance");
-      if (this.tongueCatch) distance = this.tongueCatchOverrideDistance;
       return this.tongue*distance;
     },
 
@@ -545,9 +561,8 @@ G.Map = Backbone.Model.extend({
 
     onTongueCatch: function (object) {
       var tongueDistance = Math.sqrt(object.getPosition().toIlluminated().dist2(this.getPosition()));
-      this.tongueCatch = object;
-      this.tongueCatchOverrideDistance = tongueDistance;
-      this.trigger("catch", object);
+      this.caughtPeople.push(object);
+      this.trigger("catch", object, tongueDistance);
     },
 
     update: function () {
@@ -560,13 +575,14 @@ G.Map = Backbone.Model.extend({
         this.slimRemain = slim - r;
         this.slim(r);
       }
-      if (this.tongueCatch) {
-        var tongueDistance = Math.sqrt(this.tongueCatch.getPosition().toIlluminated().dist2(this.getPosition()));
-        if (this.currentTongueLength() < this.eatDistance) {
-          this.trigger("eat", this.tongueCatch);
-          this.tongueCatchOverrideDistance = undefined;
-          this.tongueCatch = null;
-        }
+      if (this.caughtPeople.size()) {
+        var self = this;
+        this.caughtPeople.each(function (people) {
+          var tongueDistance = Math.sqrt(people.getPosition().toIlluminated().dist2(self.getPosition()));
+          if (self.currentTongueLength() < self.eatDistance) {
+            self.trigger("eat", people);
+          }
+        });
       }
     },
 
@@ -660,7 +676,7 @@ G.Map = Backbone.Model.extend({
       }
     },
     decide: function (entity) {
-      if (this.blocked) return;
+      if (this.caught) return;
       var danger = this.checkDanger(entity);
       if (danger) {
         this.stopped = false;
@@ -684,7 +700,7 @@ G.Map = Backbone.Model.extend({
       G.Controls.prototype.update.apply(this, arguments);
     },
     speed: function (entity) {
-      if (this.stopped) return 0;
+      if (this.stopped || this.caught) return 0;
       var speed = this.get("speed");
       if (this.running)
         speed *= this.runFactor;
@@ -697,7 +713,6 @@ G.Map = Backbone.Model.extend({
 
   G.PlayerControls = G.Controls.extend({
     initialize: function () {
-      this.lastUpdate = +new Date();
       this._down = {};
       this.mousedown = 0;
       this.mouseup = 0;
