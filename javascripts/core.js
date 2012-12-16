@@ -608,6 +608,7 @@ G.Map = Backbone.Model.extend({
     angle: function (entity) {
       var pointer = this.get("pointer");
       if (pointer) {
+        pointer = this.camera.canvasToRealPosition(pointer);
         var now = +new Date();
         if (!this.angleTargetTime) this.angleTargetTime=now;
         var t = ((now-this.angleTargetTime)/1000);
