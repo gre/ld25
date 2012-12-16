@@ -86,11 +86,8 @@
 
     // Initial game state
     player.opacity = 0;
-    for (var i=0; i<15; ++i)
-      game.addRandomPeople({
-        x: window.innerWidth/2,
-        y: window.innerHeight/2
-      }, (window.innerHeight+window.innerWidth)/2);
+    for (var i=0; i<30; ++i)
+      game.addRandomPeople();
     game.darkmask.color = "rgba(0,0,0,0)";
     game.withLights = false;
 
@@ -208,8 +205,10 @@
 
     (function loop () {
       requestAnimationFrame(loop, game.canvas);
+      window.stats && stats.begin();
       update();
       game.render(ctx, camera);
+      window.stats && stats.end();
     }());
     
   }

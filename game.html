@@ -25,6 +25,19 @@
     </div>
 
   </div>
+
+  <script type="text/javascript" src="vendors/stats.min.js"></script>
+  <script type="text/javascript">
+  window.stats = new Stats();
+stats.setMode(0); // 0: fps, 1: ms
+
+// Align top-left
+stats.domElement.style.position = 'absolute';
+stats.domElement.style.right = '0px';
+stats.domElement.style.bottom = '0px';
+
+document.body.appendChild( stats.domElement );
+  </script>
   
   <!-- libs -->
   <script type="text/javascript" src="vendors/rAF.js"></script>

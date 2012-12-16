@@ -9,6 +9,10 @@
     , DarkMask = illuminated.DarkMask
     ;
 
+b2Vec2.prototype.toIlluminated = function () {
+  return new illuminated.Vec2(this.x, this.y);
+}
+
 function createCanvas (w, h) {
   var c = document.createElement("canvas");
   c.width = w;
@@ -114,16 +118,19 @@ G.Map = Backbone.Model.extend({
       this.player = p;
     },
         
-    addRandomPeople: function (center, disp) {
+    addRandomPeople: function () {
+      var x = (0.1+0.8*Math.random()) * this.map.get("width");
+      var y = (0.1+0.8*Math.random()) * this.map.get("height");
       var people = new G.People({
-        x: center.x+(disp*(Math.random()-0.5)),
-        y: center.y+(disp*(Math.random()-0.5)),
+        x: x,
+        y: y,
         angle: 2*Math.PI*Math.random(),
         width: 80,
         height: 80,
         sex: Math.random()>.5 ? "m" : "f",
         model: Math.floor(Math.random()*4)
       });
+
       var ai = new G.PeopleAI({
         endurance: 10,
         speed: 80+Math.round(40*Math.random())
@@ -161,9 +168,14 @@ G.Map = Backbone.Model.extend({
     },
 
     update: function () {
+      var self = this;
       this.people.each(function (people) {
         people.update();
+        if (self.player.tongueCollide(people)) {
+          self.player.onTongueCatch(people);
+        }
       });
+      this.player && this.player.update();
     },
 
     renderLights: function (ctx, camera) {
@@ -383,6 +395,16 @@ G.Map = Backbone.Model.extend({
       this.lastSpriteTime = +new Date();
       this.lastSprite = 1;
       this.speed = 200;
+      var self = this;
+      this.on("tongueCatch", function () {
+        self.ai.stopped = true;
+        self.ai.blocked = true;
+        self.shakingInterval = 40;
+        self.shaking = 10;
+      });
+      this.on("monsterEat", function () {
+        this.destroy();
+      });
     },
     setAI: function (ai) {
       this.ai = ai;
@@ -453,6 +475,7 @@ G.Map = Backbone.Model.extend({
       this.tongue = 0; /* from 0 to 1 */
       this.tongueSpeedOut = 10;
       this.tongueSpeedIn = 10;
+      this.eatDistance = 50;
     },
     sprite: function () {
       var i = 0;
@@ -479,6 +502,48 @@ G.Map = Backbone.Model.extend({
       this.tongueDuration = duration;
       this.tongueDate = +new Date();
     },
+
+    currentTongueLength: function () {
+      var distance = this.get("tongueDistance");
+      if (this.tongueCatch) distance = this.tongueCatchOverrideDistance;
+      return this.tongue*distance;
+    },
+
+    tongueCollide: function (object) {
+      if (this.tongue == 0) return false;
+      var v = object.getPosition().Copy();
+      v.Subtract(this.getPosition());
+      var distance = v.Length();
+      var currentTongueLength = this.currentTongueLength();
+      if (distance<currentTongueLength) {
+        var a = Math.atan2(v.y, v.x)+this.get("angle");
+        if (a>Math.PI) a -= 2*Math.PI;
+        var DELTA = 0.15;
+        if (-DELTA<a && a<DELTA) {
+          return true;
+        }
+      }
+      return false;
+    },
+
+    onTongueCatch: function (object) {
+      var tongueDistance = Math.sqrt(object.getPosition().toIlluminated().dist2(this.getPosition()));
+      this.tongueCatch = object;
+      this.tongueCatchOverrideDistance = tongueDistance;
+      object.trigger("tongueCatch");
+    },
+
+    update: function (object) {
+      if (this.tongueCatch) {
+        var tongueDistance = Math.sqrt(this.tongueCatch.getPosition().toIlluminated().dist2(this.getPosition()));
+        if (this.currentTongueLength() < this.eatDistance) {
+          this.tongueCatch.trigger("monsterEat");
+          this.tongueCatchOverrideDistance = undefined;
+          this.tongueCatch = null;
+        }
+      }
+    },
+
     render: function (ctx, camera) {
       if (this.tongueAnimation) {
         var now = +new Date();
@@ -493,8 +558,7 @@ G.Map = Backbone.Model.extend({
         var TONGUE_X = Math.round(width/5), 
             TONGUE_Y = Math.round(width/80),
             TONGUE_W = Math.round(width/6);
-        var tongueLength = this.get("tongueDistance") - TONGUE_X;
-        var length = Math.round(this.tongue*tongueLength);
+        var length = Math.round(this.currentTongueLength());
         var angle = this.get("angle");
         var p = camera.realPositionToCanvas(this.getPosition());
         ctx.save();
@@ -505,7 +569,7 @@ G.Map = Backbone.Model.extend({
         ctx.rotate(-angle);
         ctx.beginPath();
         ctx.moveTo(TONGUE_X, TONGUE_Y);
-        ctx.lineTo(TONGUE_X+length, TONGUE_Y);
+        ctx.lineTo(length, TONGUE_Y);
         ctx.stroke();
         ctx.closePath();
         ctx.restore();
@@ -527,6 +591,8 @@ G.Map = Backbone.Model.extend({
       entity.speed = speed;
       entity.x = entity.x + Math.cos(-angle)*speed*t;
       entity.y = entity.y + Math.sin(-angle)*speed*t;
+      if (angle<2*Math.PI) angle += 2*Math.PI;
+      if (angle>2*Math.PI) angle -= 2*Math.PI;
       entity.set("angle", angle);
       this.lastUpdate = now;
     }
@@ -567,6 +633,7 @@ G.Map = Backbone.Model.extend({
       }
     },
     decide: function (entity) {
+      if (this.blocked) return;
       var danger = this.checkDanger(entity);
       if (danger) {
         this.stopped = false;
@@ -631,7 +698,7 @@ G.Map = Backbone.Model.extend({
         speed = -this.get("backwardSpeed");
       }
       var pointer = this.get("pointer");
-      if (pointer) {
+      if (!backward && pointer) {
         var d = this.distanceWithPointer(entity);
         speed *= G.smoothstep(30, 150, d);
       }
