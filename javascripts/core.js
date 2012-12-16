@@ -236,7 +236,7 @@ G.Map = Backbone.Model.extend({
       var pos = this.getPosition();
       return new b2Vec2(
         (-pos.x + p.x)/scale,
-        (-pos.y + height - p.y)/scale
+        (-pos.y + p.y)/scale
       )
     },
 
@@ -246,7 +246,7 @@ G.Map = Backbone.Model.extend({
       var height = this.get("h");
       return new b2Vec2(
         Math.round(pos.x + scale*p.x),
-        Math.round(-pos.y + height -scale*p.y)
+        Math.round(pos.y + scale*p.y)
       )
     },
 
@@ -254,7 +254,7 @@ G.Map = Backbone.Model.extend({
       var pos = this.getPosition();
       var scale = this.get("scale");
       var height = this.get("h");
-      ctx.translate(pos.x, Math.round(-pos.y-scale*this.worldheight+height));
+      ctx.translate(pos.x, pos.y);
     },
 
     translateContextWithParallax: function (ctx, x, y) {
@@ -263,7 +263,7 @@ G.Map = Backbone.Model.extend({
       var height = this.get("h");
       ctx.translate(
         Math.round(pos.x*x), 
-        Math.round(-pos.y*y-scale*this.worldheight+height)
+        Math.round(pos.y*y)
       );
     },
 
