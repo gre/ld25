@@ -24,8 +24,8 @@
     var canvas = $("canvas.game")[0];
     var ctx = canvas.getContext("2d");
 
-    var game = G.instance = new G.Game();
-    var map = new G.Map({
+    var game = new G.Game();
+    var map = G.map = new G.Map({
       width: 2000,
       height: 2000
     });
@@ -39,12 +39,12 @@
     var player = new G.Monster({
       x: map.get("width")/2,
       y: map.get("height")/2,
-      width: 200,
-      height: 200,
-      vitalWidth: 80,
+      width: 220,
+      height: 220,
+      vitalWidth: 100,
       angle: 0,
       tongueDistance: 200,
-      slimSpeed: 3
+      slimSpeed: 2
     });
     game.setPlayer(player);
 
@@ -85,7 +85,7 @@
 
     // Custom events
     player.on("eat", function (people) {
-      player.grow(10+Math.round(5*Math.random()));
+      player.grow(4+Math.round(2*Math.random()));
 
       people._watchPlayerMove && player.off("move", people._watchPlayerMove);
       people.destroy();
@@ -117,9 +117,27 @@
       */
     });
 
+    var lastSwitch = 0;
+    player.on("runSpriteSwitch", function () {
+      lastSwitch = +new Date();
+    });
+
+    function updateWalkShake () {
+      var now = +new Date();
+      var d = now-lastSwitch;
+      if (d < 50) {
+        camera.shakingInterval = 13;
+        camera.shaking = (player.get("tongueDistance")/80);
+        camera.shake();
+      }
+      else {
+        camera.shaking = 0;
+      }
+    }
+
     // Initial game state
     player.opacity = 0;
-    for (var i=0; i<60; ++i)
+    for (var i=0; i<20; ++i)
       game.addRandomPeople();
     game.darkmask.color = "rgba(0,0,0,0)";
     game.withLights = false;
@@ -207,7 +225,6 @@
         }
       });
 
-
     var timeline = new G.Timeline();
 
     timeline
@@ -245,6 +262,7 @@
         loop: function (t) {
           game.update();
           camera.focusOn(player.getPosition());
+          updateWalkShake();
         }
       })
       .start();

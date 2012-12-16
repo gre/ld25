@@ -82,6 +82,13 @@ G.Map = Backbone.Model.extend({
       return [r,g,b];
     }));
     ctx.drawImage(n2, 0, 0);
+  },
+  
+  validPosition: function (p, radius) {
+    radius = radius || 0;
+    if (p.x<radius || this.get("width")-radius<p.x
+     || p.y<radius || this.get("height")-radius<p.y) return false;
+    return true;
   }
 });
 
@@ -108,6 +115,8 @@ G.Map = Backbone.Model.extend({
       });
 
       this.withLights = true;
+
+      this.peopleOpponents = new Backbone.Collection();
     },
 
     setMap: function (map) {
@@ -132,17 +141,22 @@ G.Map = Backbone.Model.extend({
       });
 
       var ai = new G.PeopleAI({
-        endurance: 10,
+        reactionTime: 700+Math.round(1000*Math.random()),
         speed: 80+Math.round(40*Math.random())
       });
-      // FIXME TODO: give the AI a way to check if there are collisions + out of bounds : functions?
+      // FIXME TODO: give the AI a way to check if there are collisions 
+      // + out of bounds : functions?
       people.setAI(ai);
+
+      people.ai.opponents = this.peopleOpponents;
       this.people.push(people);
     },
 
     makePeopleAwareOfPlayer: function (player) {
+      this.peopleOpponents.push(player);
+      var self = this;
       this.people.each(function (people) {
-        people.ai.opponents.push(player);
+        people.ai.opponents = self.peopleOpponents;
         people.ai.decide(people);
       });
     },
@@ -173,7 +187,7 @@ G.Map = Backbone.Model.extend({
       if (!this.lastPeopleAdd) this.lastPeopleAdd = now;
       if (now-this.lastPeopleAdd > 1000) {
         this.lastPeopleAdd = now;
-        //this.addRandomPeople();
+        this.addRandomPeople();
       }
     },
 
@@ -275,8 +289,8 @@ G.Map = Backbone.Model.extend({
 
     getPosition: function () {
       return new b2Vec2(
-        this.get("x")+(this.shaking && this.shakex), 
-        this.get("y")+(this.shaking && this.shakey)
+        this.get("x")+(this.shaking && this.shakex || 0), 
+        this.get("y")+(this.shaking && this.shakey || 0)
       );
     },
     
@@ -363,8 +377,8 @@ G.Map = Backbone.Model.extend({
     },
     getPosition: function () {
       return new b2Vec2(
-        this.x+(this.shaking && this.shakex), 
-        this.y+(this.shaking && this.shakey)
+        this.x+(this.shaking && this.shakex || 0), 
+        this.y+(this.shaking && this.shakey || 0)
       );
     },
     shake: function () {
@@ -380,19 +394,25 @@ G.Map = Backbone.Model.extend({
     },
     render: function (ctx, camera) {
       if (!this.opacity) return;
+      var p = camera.realPositionToCanvas(this.getPosition());
+      var cw = camera.get("w");
+      var ch = camera.get("h");
+      var w = this.get("width")||image.width;
+      var h = this.get("height")||image.height;
+      var visible = -w/2 < p.x && p.x < cw+w/2 && 
+                    -h/2 < p.y && p.y < ch+h/2;
+      if (!visible && this.isCaught && this.isCaught()) 
+      if (!visible) return;
       if (this.shaking) this.shake();
       var angle = this.get("angle");
       var sprite = this.sprite();
       var image = sprite.image;
-      var w = this.get("width")||image.width;
-      var h = this.get("height")||image.height;
       var halfW = Math.round(w/2);
       var halfH = Math.round(h/2);
       var spritex = sprite.x||0;
       var spritey = sprite.y||0;
       var spritew = sprite.w||image.width;
       var spriteh = sprite.h||image.height;
-      var p = camera.realPositionToCanvas(this.getPosition());
       ctx.save();
       ctx.globalAlpha = this.opacity;
       ctx.translate(p.x, p.y);
@@ -517,6 +537,7 @@ G.Map = Backbone.Model.extend({
         if (now-this.lastSpriteTime > 50000/Math.abs(this.speed)) {
           this.lastSprite = i = i==1 ? 2 : 1;
           this.lastSpriteTime = now;
+          this.trigger("runSpriteSwitch", i);
         }
       }
       var imageId = this.sprites[i];
@@ -628,13 +649,22 @@ G.Map = Backbone.Model.extend({
       var now = +new Date();
       if (!this.lastUpdate) this.lastUpdate=now;
       var t = (now-this.lastUpdate)/1000;
+
       var angle = this.angle(entity);
-      var speed = this.speed(entity);
-      entity.speed = speed;
-      entity.x = entity.x + Math.cos(-angle)*speed*t;
-      entity.y = entity.y + Math.sin(-angle)*speed*t;
       if (angle<2*Math.PI) angle += 2*Math.PI;
       if (angle>2*Math.PI) angle -= 2*Math.PI;
+
+      var speed = this.speed(entity);
+      entity.speed = speed;
+      var x = entity.x + Math.cos(-angle)*speed*t;
+      var y = entity.y + Math.sin(-angle)*speed*t;
+       
+      // FIXME G.map should not exists
+      if (G.map.validPosition(new b2Vec2(x, y), entity.get("width")/4)) {
+        entity.x = x;
+        entity.y = y;
+      }
+
       entity.set("angle", angle);
       this.lastUpdate = now;
       entity.trigger("move", entity);
@@ -647,7 +677,6 @@ G.Map = Backbone.Model.extend({
       this.running = false;
       this.runFactor = 2;
       this.visibility = 250;
-      this.decisionInterval = 1500;
       this.lastDecision = +new Date();
       this.a = 2*Math.PI*Math.random();
       this.opponents = new Backbone.Collection();
@@ -693,7 +722,7 @@ G.Map = Backbone.Model.extend({
     },
     update: function (entity) {
       var now = +new Date();
-      if (now-this.lastDecision>this.decisionInterval) {
+      if (now-this.lastDecision>this.get("reactionTime")) {
         this.lastDecision = now;
         this.decide(entity);
       }
