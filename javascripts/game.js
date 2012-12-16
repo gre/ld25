@@ -77,22 +77,55 @@
       setViewport(window.innerWidth, window.innerHeight);
     });
 
-    var timeline = new G.Timeline();
+    // Initial game state
+    player.opacity = 0;
+    for (var i=0; i<10; ++i)
+      game.addRandomPeople();
+    game.darkmask.color = "rgba(0,0,0,0)";
+    game.withLights = false;
 
+    var storyStart = new G.Timeline();
 
-    timeline.
-      once(0, function () {
-        player.opacity = 0;
-        for (var i=0; i<10; ++i)
-          game.addRandomPeople();
-      }).
+    var $story = $("#story");
+    var $story_h1 = $story.find("h1");
+    var $story_h2 = $story.find("h2");
+    var $story_h2_points = $story_h2.find(".points");
+    storyStart
+      .once(0, function () {
+        $story.show();
+      })
+      .between(200, 3500, {
+        start: function () {
+          $story_h1.addClass("visible");
+        },
+        stop: function () {
+          $story_h1.removeClass("visible");
+        }
+      })
+      .once(1500, function(){ $story_h2_points.text(".") })
+      .once(2250, function(){ $story_h2_points.text("..") })
+      .once(3000, function(){ $story_h2_points.text("...") })
+      .between(1000, 3500, {
+        start: function () {
+          $story_h2.addClass("visible");
+        },
+        stop: function () {
+          $story_h2.removeClass("visible");
+        }
+      })
+      .once(3900, function () {
+        $story.hide();
+      })
+      ;
+
+    var playerEnterInGame = new G.Timeline();
+
+    playerEnterInGame.
       between(0, 2000, {
         start: function () {
-          game.darkmask.color = "rgba(0,0,0,0)";
-          game.withLights = false;
         },
-        loop: function () {
-          var alpha = Math.round(90*G.smoothstep(2000, 3000, timeline.time()))/100;
+        loop: function (t, p) {
+          var alpha = Math.round(90*p)/100;
           game.darkmask.color = "rgba(0,0,0,"+alpha+")";
         },
         stop: function () {
@@ -112,7 +145,6 @@
           });
         },
         loop: function (t, p) {
-          //var p = G.smoothstep(1000, 2500, timeline.time());
           player.opacity = p;
           camera.shaking = 100*(1-p);
           player.set({
@@ -130,25 +162,42 @@
         }
       }).
       // Update functions
-      before(2000, {
-        loop: function () {
-          game.update();
-        }
-      }).
       after(2000, { 
         loop: function (t) {
           controls.update(player);
-          game.update();
         }
       });
 
 
+    var timeline = new G.Timeline();
+
+    timeline
+      .once(0, function () {
+        storyStart.start();
+      })
+      .after(4000, {
+        start: function () {
+          playerEnterInGame.start();
+        },
+        loop: function () {
+          playerEnterInGame.update();
+        }
+      })
+      .always({
+        loop: function () {
+          game.update();
+        }
+      })
+      .start();
+
     function update () {
+      storyStart.update();
+      timeline.update();
     }
 
     (function loop () {
       requestAnimationFrame(loop, game.canvas);
-      timeline.update();
+      update();
       game.render(ctx, camera);
     }());
     

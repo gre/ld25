@@ -1,19 +1,36 @@
 (function (G) {
 
-  // TODO start / stop method
+  // TODO stop method
 
   G.Timeline = function () {
-    this.start = +new Date();
     this.updates = [];
     this.updatesArguments = [];
     this.instants = [];
+
+    this.ends = [];
+  }
+
+  G.Timeline.prototype._onend = function () {
+    for (var i=0; i<this.ends.length; ++i)
+      this.ends[i]();
+  }
+  
+  G.Timeline.prototype.end = function (cb) {
+    this.ends.push(cb);
+  }
+
+  G.Timeline.prototype.start = function () {
+    this.start = +new Date();
+    return this;
   }
 
   G.Timeline.prototype.time = function () {
+    if (!this.start) return 0;
     return +new Date() - this.start;
   }
 
   G.Timeline.prototype.update = function () {
+    if (this.hasEnd) return;
     var i = 0;
     while (i<this.instants.length) {
       var instant = this.instants[i];
@@ -30,6 +47,10 @@
 
     for (var i=0; i<this.updates.length; ++i)
       this.updates[i].apply(this, this.updatesArguments[i].call(this));
+    if (this.instants.length==0 && this.updates.length==0) {
+      this._onend();
+      this.hasEnd=true;
+    }
   }
 
   G.Timeline.prototype._addInstant = function (i) {
@@ -88,6 +109,11 @@
   
   G.Timeline.prototype.after = function (after, callbacks) {
     this.between(after, +Infinity, callbacks);
+    return this;
+  }
+
+  G.Timeline.prototype.always = function (callbacks) {
+    this.between(0, +Infinity, callbacks);
     return this;
   }
 
