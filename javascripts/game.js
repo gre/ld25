@@ -25,10 +25,17 @@
     var ctx = canvas.getContext("2d");
 
     var game = G.instance = new G.Game();
+    var map = new G.Map({
+      width: 2000,
+      height: 2000
+    });
+    game.setMap(map);
     var camera = new G.Camera({
       x: 0,
-      y: 0
+      y: 0,
+      scale: 1
     });
+    camera.setWorldSize(map.get("width"), map.get("height"));
     var player = new G.Monster({
       x: window.innerWidth/2,
       y: window.innerHeight/2,
@@ -49,7 +56,7 @@
       backwardSpeed: 100, // pixel per sec
       rotationSpeed: 5 // radian per sec
     });
-
+    controls.setCamera(camera);
 
     $(window).on("mousedown", function () {
       player.tongueOut(player.tongueSpeedOut);
@@ -66,7 +73,7 @@
     });
 
     function setViewport (w, h) {
-      camera.setSize(w, h);
+      camera.resize(w, h);
       canvas.width = w;
       canvas.height = h;
       game.render(ctx, camera);
@@ -79,8 +86,11 @@
 
     // Initial game state
     player.opacity = 0;
-    for (var i=0; i<10; ++i)
-      game.addRandomPeople();
+    for (var i=0; i<15; ++i)
+      game.addRandomPeople({
+        x: window.innerWidth/2,
+        y: window.innerHeight/2
+      }, (window.innerHeight+window.innerWidth)/2);
     game.darkmask.color = "rgba(0,0,0,0)";
     game.withLights = false;
 
@@ -165,6 +175,7 @@
       after(2000, { 
         loop: function (t) {
           controls.update(player);
+          camera.focusOn(player.getPosition());
         }
       });
 
@@ -175,7 +186,7 @@
       .once(0, function () {
         storyStart.start();
       })
-      .after(4000, {
+      .after(3000, {
         start: function () {
           playerEnterInGame.start();
         },

@@ -1,5 +1,9 @@
 (function(G){
 
+  var b2Vec2 = Box2D.Common.Math.b2Vec2
+    , b2PolygonShape = Box2D.Collision.Shapes.b2PolygonShape
+    ;
+
   var Lamp = illuminated.Lamp
     , Lighting = illuminated.Lighting
     , DarkMask = illuminated.DarkMask
@@ -67,10 +71,6 @@ G.Map = Backbone.Model.extend({
     initialize: function () {
       this.startTime = +new Date();
       this.people = new Backbone.Collection();
-      this.map = new G.Map({
-        width: 2000,
-        height: 2000
-      });
       
       this.playerLight = new Lamp({
         color: "rgba(240,220,180,0.8)",
@@ -91,15 +91,20 @@ G.Map = Backbone.Model.extend({
 
       this.withLights = true;
     },
+
+    setMap: function (map) {
+      this.map = map;
+    },
     
     setPlayer: function (p) {
       this.player = p;
     },
         
-    addRandomPeople: function () {
+    addRandomPeople: function (center, disp) {
       var people = new G.People({
-        x: Math.random()*window.innerWidth,
-        y: Math.random()*window.innerHeight,
+        x: center.x+(disp*(Math.random()-0.5)),
+        y: center.y+(disp*(Math.random()-0.5)),
+        angle: 2*Math.PI*Math.random(),
         width: 80,
         height: 80,
         sex: Math.random()>.5 ? "m" : "f",
@@ -121,11 +126,13 @@ G.Map = Backbone.Model.extend({
     },
 
     updateIlluminatedScene: function (ctx, camera) {
+      var p = camera.realPositionToCanvas(this.player.getPosition());
+      var scale = camera.get("scale");
       this.playerLight.position = new illuminated.Vec2(
-        this.player.x,
-        this.player.y
+        p.x,
+        p.y
       );
-      this.playerLight.distance = 1.5*this.player.get("tongueDistance");
+      this.playerLight.distance = 1.5*this.player.get("tongueDistance")/scale;
       this.playerLight.angle = this.player.get("angle");
       this.lighting.compute(ctx.canvas.width, ctx.canvas.height);
       this.darkmask.compute(ctx.canvas.width, ctx.canvas.height);
@@ -152,7 +159,10 @@ G.Map = Backbone.Model.extend({
     },
 
     renderFloor: function (ctx, camera) {
+      ctx.save();
+      camera.translateContext(ctx);
       ctx.drawImage(this.map.floorTexture, 0, 0);
+      ctx.restore();
     },
     render: function (ctx, camera) {
       this.updateIlluminatedScene(ctx, camera);
@@ -169,13 +179,14 @@ G.Map = Backbone.Model.extend({
     }
   });
 
+  // Inspired from https://github.com/gre/blazing-race/blob/master/js/game/Camera.js
   G.Camera = Backbone.Model.extend({
     initialize: function () {
       var self = this;
       this.shaking = 0;
       this.shakingInterval = 80;
     },
-    setSize: function (w, h) {
+    resize: function (w, h) {
       var w = window.innerWidth;
       var h = window.innerHeight;
       this.set("w", w);
@@ -190,23 +201,121 @@ G.Map = Backbone.Model.extend({
         this.shakey = this.shaking*(2*Math.random()-1);
       }
     },
-    getX: function () {
-      return this.x+this.shakex;
+
+    getShape: function () {
+      var topleft = this.canvasToRealPosition(new b2Vec2(0,0));
+      var bottomright = this.canvasToRealPosition(new b2Vec2(this.get("w"),this.get("h")));
+      return b2PolygonShape.AsOrientedBox(
+        bottomright.x-topleft.x, 
+        topleft.y-bottomright.y, 
+        new b2Vec2(
+          (topleft.x+bottomright.x)/2, 
+          (topleft.y+bottomright.y)/2
+        ));
     },
-    getY: function () {
-      return this.y+this.shakey;
+
+    setWorldSize: function (w, h) {
+      this.worldwidth = w;
+      this.worldheight = h;
+    },
+
+    setScale: function (s) {
+      this.set("scale", s);
+    },
+
+    getPosition: function () {
+      return new b2Vec2(
+        this.get("x")+(this.shakex||0), 
+        this.get("y")+(this.shakey||0)
+      );
+    },
+    
+    canvasToRealPosition: function (p) {
+      var scale = this.get("scale");
+      var height = this.get("h");
+      var pos = this.getPosition();
+      return new b2Vec2(
+        (-pos.x + p.x)/scale,
+        (-pos.y + height - p.y)/scale
+      )
+    },
+
+    realPositionToCanvas: function (p) {
+      var pos = this.getPosition();
+      var scale = this.get("scale");
+      var height = this.get("h");
+      return new b2Vec2(
+        Math.round(pos.x + scale*p.x),
+        Math.round(-pos.y + height -scale*p.y)
+      )
+    },
+
+    translateContext: function (ctx) {
+      var pos = this.getPosition();
+      var scale = this.get("scale");
+      var height = this.get("h");
+      ctx.translate(pos.x, Math.round(-pos.y-scale*this.worldheight+height));
+    },
+
+    translateContextWithParallax: function (ctx, x, y) {
+      var pos = this.getPosition();
+      var scale = this.get("scale");
+      var height = this.get("h");
+      ctx.translate(
+        Math.round(pos.x*x), 
+        Math.round(-pos.y*y-scale*this.worldheight+height)
+      );
+    },
+
+
+    // Move the camera centered to the position v
+    focusOn: function (v) {
+      var scale = this.get("scale");
+      var width = this.get("w");
+      var height = this.get("h");
+      var x, y;
+      if (scale*this.worldwidth > width) {
+        if (v.x*scale < (scale*this.worldwidth - width/2) && v.x*scale > width/2) {
+          x = -(v.x*scale)+(width/2);
+        }
+        else if(v.x*scale >= (scale*this.worldwidth-width/2)) {
+          x = width-scale*this.worldwidth;
+        }
+        else {
+          x = 0;
+        }
+        this.set("x", Math.round(x));
+      }
+      if(scale*this.worldheight > height) {
+        if(v.y*scale < (scale*this.worldheight - height/2) && v.y*scale > height/2) {
+          y = -(v.y*scale)+(height/2);
+        }
+        else if(v.y*scale >= (scale*this.worldheight - height/2)) {
+          y = (height - scale*this.worldheight);
+        }
+        else {
+          y = 0;
+        }
+        this.set("y", Math.round(y));
+      }
     }
+
+
   });
 
   G.Character = Backbone.Model.extend({
     initialize: function () {
       this.x = this.get("x");
       this.y = this.get("y");
-      this.width = this.get("width");
-      this.height = this.get("height");
       this.opacity = 1;
       this.shaking = 0;
       this.shakingInterval = 200;
+    },
+    getPosition: function () {
+      return new b2Vec2(
+        this.x+(this.shakex||0), 
+        this.y+(this.shakey||0)
+      );
     },
     shake: function () {
       var now = +new Date();
@@ -219,6 +328,7 @@ G.Map = Backbone.Model.extend({
     },
     render: function (ctx, camera) {
       if (!this.opacity) return;
+      if (this.shaking) this.shake();
       var angle = this.get("angle");
       var sprite = this.sprite();
       var image = sprite.image;
@@ -230,16 +340,10 @@ G.Map = Backbone.Model.extend({
       var spritey = sprite.y||0;
       var spritew = sprite.w||image.width;
       var spriteh = sprite.h||image.height;
-      var x = this.x;
-      var y = this.y;
-      if (this.shaking) {
-        this.shake();
-        x += this.shakex;
-        y += this.shakey;
-      }
+      var p = camera.realPositionToCanvas(this.getPosition());
       ctx.save();
       ctx.globalAlpha = this.opacity;
-      ctx.translate(Math.round(x), Math.round(y));
+      ctx.translate(p.x, p.y);
       angle && ctx.rotate(-angle);
       ctx.drawImage(image, 
         spritex, spritey, spritew, spriteh,
@@ -360,11 +464,12 @@ G.Map = Backbone.Model.extend({
         var tongueLength = this.get("tongueDistance") - TONGUE_X;
         var length = Math.round(this.tongue*tongueLength);
         var angle = this.get("angle");
+        var p = camera.realPositionToCanvas(this.getPosition());
         ctx.save();
         ctx.strokeStyle = "#d31744";
         ctx.lineWidth = TONGUE_W;
         ctx.lineCap = "round";
-        ctx.translate(this.x, this.y);
+        ctx.translate(p.x, p.y);
         ctx.rotate(-angle);
         ctx.beginPath();
         ctx.moveTo(TONGUE_X, TONGUE_Y);
@@ -401,9 +506,9 @@ G.Map = Backbone.Model.extend({
       this.running = false;
       this.runFactor = 2;
       this.visibility = 250;
-      this.decisionInterval = 2000;
+      this.decisionInterval = 1500;
       this.lastDecision = +new Date();
-      this.a = 0;
+      this.a = 2*Math.PI*Math.random();
       this.opponents = new Backbone.Collection();
     },
     checkDanger: function (entity) {
@@ -479,6 +584,9 @@ G.Map = Backbone.Model.extend({
         self.set("pointer", { x: e.clientX, y: e.clientY });
       });
     },
+    setCamera: function (camera) {
+      this.camera = camera;
+    },
     speed: function (entity) {
       var keys = this.get("keys");
       var forward = this.isDown(keys.forward);
@@ -522,6 +630,7 @@ G.Map = Backbone.Model.extend({
     distanceWithPointer: function (entity) {
       var pointer = this.get("pointer");
       if (!pointer) return Infinity;
+      pointer = this.camera.canvasToRealPosition(pointer);
       var x = entity.x-pointer.x;
       var y = entity.y-pointer.y;
       return Math.sqrt(x*x+y*y);
