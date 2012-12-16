@@ -16,20 +16,25 @@ function createCanvas (w, h) {
   return c;
 }
 
-function randomNoise(canvas, x, y, width, height, alpha) {
+function randomNoise(canvas, x, y, width, height, alpha, getRandomColor) {
     x = x || 0;
     y = y || 0;
     width = width || canvas.width;
     height = height || canvas.height;
     alpha = alpha || 255;
+    getRandomColor = getRandomColor || function () {
+        var r = (Math.random() * 256) | 0;
+        return [ r, r, r ];
+    };
     var g = canvas.getContext("2d"),
         imageData = g.getImageData(x, y, width, height),
-        random = Math.random,
         pixels = imageData.data,
         n = pixels.length,
         i = 0;
     while (i < n) {
-        pixels[i++] = pixels[i++] = pixels[i++] = (random() * 256) | 0;
+        var color = getRandomColor();
+        for (var c=0; c<3; ++c)
+          pixels[i++] = color[c];
         pixels[i++] = alpha;
     }
     g.putImageData(imageData, x, y);
@@ -56,13 +61,23 @@ function perlinNoise(canvas, force, noise) {
 G.Map = Backbone.Model.extend({
   initialize: function () {
     var w = this.get("width"), h = this.get("height");
-    var perlinCanvas = createCanvas(w, h);
-    perlinNoise(perlinCanvas, 1000, randomNoise(createCanvas(w, h), 0, 0, w, h, 5));
     this.floorTexture = createCanvas(w, h);
     var ctx = this.floorTexture.getContext("2d");
     ctx.fillStyle = "#234";
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    ctx.drawImage(perlinCanvas, 0, 0);
+
+    var road = createCanvas(w, h);
+    perlinNoise(road, 1000, randomNoise(createCanvas(w, h), 0, 0, w, h, 5));
+    ctx.drawImage(road, 0, 0);
+
+    var n2 = createCanvas(w, h);
+    perlinNoise(n2, 0.8, randomNoise(createCanvas(w, h), 0, 0, w, h, 100, function () {
+      var r = Math.random()*256;
+      var g = Math.random()*256;
+      var b = Math.random()*256;
+      return [r,g,b];
+    }));
+    ctx.drawImage(n2, 0, 0);
   }
 });
 
@@ -84,9 +99,8 @@ G.Map = Backbone.Model.extend({
         objects: []
       });
 
-      this.darkmask = new DarkMask({ lights: [
-          this.playerLight
-        ] 
+      this.darkmask = new DarkMask({ 
+        lights: [ this.playerLight ] 
       });
 
       this.withLights = true;
@@ -114,6 +128,7 @@ G.Map = Backbone.Model.extend({
         endurance: 10,
         speed: 80+Math.round(40*Math.random())
       });
+      // FIXME TODO: give the AI a way to check if there are collisions + out of bounds : functions?
       people.setAI(ai);
       this.people.push(people);
     },
@@ -134,7 +149,14 @@ G.Map = Backbone.Model.extend({
       );
       this.playerLight.distance = 1.5*this.player.get("tongueDistance")/scale;
       this.playerLight.angle = this.player.get("angle");
-      this.lighting.compute(ctx.canvas.width, ctx.canvas.height);
+      // Generate opaque objects
+      var lighting = this.lighting;
+      lighting.objects = [];
+      this.people.each(function (people) {
+        lighting.objects.push(people.getOpaqueObject(camera));
+      });
+      lighting.compute(ctx.canvas.width, ctx.canvas.height);
+      // 
       this.darkmask.compute(ctx.canvas.width, ctx.canvas.height);
     },
 
@@ -370,6 +392,16 @@ G.Map = Backbone.Model.extend({
     },
     isRunning: function () {
       return this.ai && this.ai.running;
+    },
+    getOpaqueObject: function (camera) {
+      var p = camera.realPositionToCanvas(this.getPosition());
+      var large = this.get("height")*0.6;
+      var angle = this.get("angle");
+      var dx = Math.round(Math.sin(angle)*large/2);
+      var dy = Math.round(Math.cos(angle)*large/2);
+      var from = new illuminated.Vec2(p.x+dx, p.y+dy);
+      var to = new illuminated.Vec2(p.x-dx, p.y-dy);
+      return new illuminated.PolygonObject({ points: [from,to] });
     },
     sprite: function () {
       var i = 0;
