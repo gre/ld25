@@ -850,9 +850,13 @@ G.Map = Backbone.Model.extend({
       this.mouseup = 0;
       var self = this;
       $(window).on("keydown", function (e) {
+        if (e.keyCode in self.get("keys"))
+          e.preventDefault();
         self._down[e.keyCode] = true;
       });
       $(window).on("keyup", function (e) {
+        if (e.keyCode in self.get("keys"))
+          e.preventDefault();
         self._down[e.keyCode] = false;
       });
       $(window).on("mousemove", function (e) {
